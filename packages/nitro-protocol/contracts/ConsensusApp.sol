@@ -1,89 +1,265 @@
-pragma solidity ^0.5.13;
+pragma solidity ^0.5.2;
 pragma experimental ABIEncoderV2;
 
-import './interfaces/ForceMoveApp.sol';
+import "fmg-core/contracts/Commitment.sol";
+import "./ConsensusCommitment.sol";
 
-/**
-  * @dev The ConsensusApp complies with the ForceMoveApp interface and allows a channel outcome to be updated if and only if all participants are in agreement.
-*/
-contract ConsensusApp is ForceMoveApp {
-    struct ConsensusAppData {
-        uint32 furtherVotesRequired;
-        bytes proposedOutcome;
+contract ConsensusApp {
+  using ConsensusCommitment for ConsensusCommitment.ConsensusCommitmentStruct;
+
+  function validTransition(
+    Commitment.CommitmentStruct memory _old,
+    Commitment.CommitmentStruct memory _new
+  ) public pure returns (bool) {
+
+    ConsensusCommitment.ConsensusCommitmentStruct memory oldCommitment = ConsensusCommitment.fromFrameworkCommitment(_old);
+    ConsensusCommitment.ConsensusCommitmentStruct memory newCommitment = ConsensusCommitment.fromFrameworkCommitment(_new);
+    uint numParticipants = _old.participants.length;
+
+    if (oldCommitment.furtherVotesRequired == 0) {
+      validateConsensusCommitment(oldCommitment);
+    } else {
+      validateProposeCommitment(oldCommitment);
     }
 
-    /**
-    * @notice Deocdes the appData.
-    * @dev Deocdes the appData.
-    * @param appDataBytes The abi.encode of a ConsensusAppData struct describing the application-specific data.
-    * @return A ConsensusAppData struct containing the application-specific data.
-    */
-    function appData(bytes memory appDataBytes) internal pure returns (ConsensusAppData memory) {
-        return abi.decode(appDataBytes, (ConsensusAppData));
+    if (newCommitment.furtherVotesRequired == 0) {
+      validateConsensusCommitment(newCommitment);
+    } else {
+      validateProposeCommitment(newCommitment);
     }
 
-    /**
-    * @notice Encodes the ConsensusApp rules.
-    * @dev Encodes the ConsensusApp rules.
-    * @param a State being transitioned from.
-    * @param b State being transitioned to.
-    * @param nParticipants Number of participants in this state channel.
-    * @return true if the transition conforms to the ConsensusApp's rules, false otherwise.
-    */
-    function validTransition(
-        VariablePart memory a,
-        VariablePart memory b,
-        uint256, // turnNumB, unused
-        uint256 nParticipants
-    ) public pure returns (bool) {
-        ConsensusAppData memory appDataA = appData(a.appData);
-        ConsensusAppData memory appDataB = appData(b.appData);
+    return validPropose(oldCommitment, newCommitment, numParticipants)   ||
+           validVote(oldCommitment, newCommitment) ||
+           validVeto(oldCommitment, newCommitment) ||
+           validPass(oldCommitment, newCommitment) ||
+           validFinalVote(oldCommitment, newCommitment) ||
+           invalidTransition();
+  }
 
-        if (appDataB.furtherVotesRequired == nParticipants - 1) {
-            // propose/veto/pass
-            require(
-                identical(a.outcome, b.outcome),
-                'ConsensusApp: when proposing/vetoing/passing outcome must not change'
-            );
-        } else if (appDataB.furtherVotesRequired == 0) {
-            // final vote
-            require(
-                appDataA.furtherVotesRequired == 1,
-                'ConsensusApp: invalid final vote, furtherVotesRequired must transition from 1'
-            );
-            require(
-                identical(appDataA.proposedOutcome, b.outcome),
-                'ConsensusApp: invalid final vote, outcome must equal previous proposedOutcome'
-            );
-        } else {
-            // vote
-            require(
-                appDataB.furtherVotesRequired == appDataA.furtherVotesRequired - 1,
-                'ConsensusApp: invalid vote, furtherVotesRequired should decrement'
-            );
-            require(
-                identical(a.outcome, b.outcome),
-                'ConsensusApp: when voting, outcome must not change'
-            );
-            require(
-                identical(appDataA.proposedOutcome, appDataB.proposedOutcome),
-                'ConsensusApp: invalid vote, proposedOutcome must not change'
-            );
-        }
-        return true;
+  function invalidTransition() internal pure returns (bool) {
+    revert("ConsensusApp: No valid transition found for commitments");
+  }
+
+  // Transition validations
+
+  function validPropose(
+    ConsensusCommitment.ConsensusCommitmentStruct memory oldCommitment,
+    ConsensusCommitment.ConsensusCommitmentStruct memory newCommitment,
+    uint numParticipants
+  ) internal pure returns (bool)
+  {
+    if (
+      furtherVotesRequiredInitialized(newCommitment, numParticipants)
+    ) {
+      validateBalancesUnchanged(oldCommitment, newCommitment);
+      return true;
+    } else {
+      return false;
     }
+  }
 
-    // Utilitiy helpers
-
-    /**
-    * @notice Check for equality of two byte strings
-    * @dev Check for equality of two byte strings
-    * @param a One bytes string
-    * @param b The other bytes string
-    * @return true if the bytes are identical, false otherwise.
-    */
-    function identical(bytes memory a, bytes memory b) internal pure returns (bool) {
-        return (keccak256(abi.encode(a)) == keccak256(abi.encode(b)));
+  function validVote(
+    ConsensusCommitment.ConsensusCommitmentStruct memory oldCommitment,
+    ConsensusCommitment.ConsensusCommitmentStruct memory newCommitment
+  ) internal pure returns (bool)
+  {
+    if (
+      oldCommitment.furtherVotesRequired > 1 &&
+      furtherVotesRequiredDecremented(oldCommitment, newCommitment)
+    ) {
+      validateBalancesUnchanged(oldCommitment, newCommitment);
+      validateProposalsUnchanged(oldCommitment, newCommitment);
+      return true;
+    } else {
+      return false;
     }
+  }
 
+  function validFinalVote(
+    ConsensusCommitment.ConsensusCommitmentStruct memory oldCommitment,
+    ConsensusCommitment.ConsensusCommitmentStruct memory newCommitment
+  ) internal pure returns (bool)
+  {
+    if (
+      oldCommitment.furtherVotesRequired == 1 &&
+      newCommitment.furtherVotesRequired == 0 &&
+      balancesUpdated(oldCommitment, newCommitment)
+    ) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  function validVeto(
+    ConsensusCommitment.ConsensusCommitmentStruct memory oldCommitment,
+    ConsensusCommitment.ConsensusCommitmentStruct memory newCommitment
+  ) internal pure returns (bool)
+  {
+    if (
+      oldCommitment.furtherVotesRequired > 0 &&
+      newCommitment.furtherVotesRequired == 0 &&
+      balancesUnchanged(oldCommitment, newCommitment)
+    ) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  function validPass(
+    ConsensusCommitment.ConsensusCommitmentStruct memory oldCommitment,
+    ConsensusCommitment.ConsensusCommitmentStruct memory newCommitment
+  ) internal pure returns (bool)
+  {
+    if (
+      oldCommitment.furtherVotesRequired == 0 &&
+      newCommitment.furtherVotesRequired == 0
+    ) {
+      validateBalancesUnchanged(oldCommitment, newCommitment);
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  // Helper validators
+
+  function validateBalancesUnchanged(
+    ConsensusCommitment.ConsensusCommitmentStruct memory oldCommitment,
+    ConsensusCommitment.ConsensusCommitmentStruct memory newCommitment
+  ) private pure {
+    require(
+      encodeAndHashAllocation(oldCommitment.currentAllocation) == encodeAndHashAllocation(newCommitment.currentAllocation),
+      "ConsensusApp: 'allocation' must be the same between commitments."
+    );
+    require(
+      encodeAndHashAddressArray(oldCommitment.currentDestination) == encodeAndHashAddressArray(newCommitment.currentDestination),
+      "ConsensusApp: 'destination' must be the same between commitments."
+    );
+        require(
+      encodeAndHashAddressArray(oldCommitment.currentToken) == encodeAndHashAddressArray(newCommitment.currentToken),
+      "ConsensusApp: 'token' must be the same between commitments."
+    );
+  }
+
+  function validateProposalsUnchanged(
+    ConsensusCommitment.ConsensusCommitmentStruct memory oldCommitment,
+    ConsensusCommitment.ConsensusCommitmentStruct memory newCommitment
+  ) private pure {
+    require(
+      encodeAndHashAllocation(oldCommitment.proposedAllocation) == encodeAndHashAllocation(newCommitment.proposedAllocation),
+      "ConsensusApp: 'proposedAllocation' must be the same between commitments."
+    );
+        require(
+      encodeAndHashAddressArray(oldCommitment.proposedDestination) == encodeAndHashAddressArray(newCommitment.proposedDestination),
+      "ConsensusApp: 'proposedDestination' must be the same between commitments."
+    );
+    require(
+      encodeAndHashAddressArray(oldCommitment.proposedToken) == encodeAndHashAddressArray(newCommitment.proposedToken),
+      "ConsensusApp: 'proposedToken' must be the same between commitments."
+    );
+  }
+
+  function validateConsensusCommitment(
+    ConsensusCommitment.ConsensusCommitmentStruct memory commitment
+  ) internal pure {
+    require(
+      commitment.furtherVotesRequired == 0,
+      "ConsensusApp: 'furtherVotesRequired' must be 0 during consensus."
+      );
+    require(
+      commitment.proposedAllocation.length == 0,
+      "ConsensusApp: 'proposedAllocation' must be reset during consensus."
+      );
+    require(
+      commitment.proposedDestination.length == 0,
+      "ConsensusApp: 'proposedDestination' must be reset during consensus."
+    );
+    require(
+      commitment.proposedToken.length == 0,
+      "ConsensusApp: 'proposedToken' must be reset during consensus."
+    );
+  }
+
+  function validateProposeCommitment(
+    ConsensusCommitment.ConsensusCommitmentStruct memory commitment
+  ) internal pure {
+    require(
+      commitment.furtherVotesRequired != 0,
+      "ConsensusApp: 'furtherVotesRequired' must not be 0 during propose."
+      );
+    require(
+      commitment.proposedDestination.length > 0,
+      "ConsensusApp: 'proposedDestination' must not be reset during propose."
+      );
+    require(
+      commitment.proposedToken.length == commitment.proposedAllocation.length,
+      "ConsensusApp: 'proposedToken' must be the smae length as `proposedAllocation."
+    );
+    require(
+      commitment.proposedAllocation.length == 0 || // in case it's a guarantor channel
+      commitment.proposedAllocation.length == commitment.proposedDestination.length,
+      "ConsensusApp: Outcome must be valid during propose"
+    );
+  }
+
+  // Booleans
+
+  function furtherVotesRequiredInitialized(
+    ConsensusCommitment.ConsensusCommitmentStruct memory commitment,
+    uint numParticipants
+  ) private pure returns (bool) {
+    return(
+      commitment.furtherVotesRequired == numParticipants - 1
+    );
+  }
+
+  function furtherVotesRequiredDecremented(
+    ConsensusCommitment.ConsensusCommitmentStruct memory oldCommitment,
+    ConsensusCommitment.ConsensusCommitmentStruct memory newCommitment
+  ) private pure returns (bool) {
+    return(
+      newCommitment.furtherVotesRequired == oldCommitment.furtherVotesRequired - 1
+    );
+  }
+
+  function balancesUpdated(
+    ConsensusCommitment.ConsensusCommitmentStruct memory oldCommitment,
+    ConsensusCommitment.ConsensusCommitmentStruct memory newCommitment
+  ) private pure returns (bool) {
+    return (
+      encodeAndHashAllocation(oldCommitment.proposedAllocation) == encodeAndHashAllocation(newCommitment.currentAllocation) &&
+      encodeAndHashAddressArray(oldCommitment.proposedDestination) == encodeAndHashAddressArray(newCommitment.currentDestination) &&
+      encodeAndHashAddressArray(oldCommitment.proposedToken) == encodeAndHashAddressArray(newCommitment.currentToken)
+    );
+  }
+
+  function balancesUnchanged(
+    ConsensusCommitment.ConsensusCommitmentStruct memory oldCommitment,
+    ConsensusCommitment.ConsensusCommitmentStruct memory newCommitment
+  ) private pure returns (bool) {
+    return (
+      encodeAndHashAllocation(oldCommitment.currentAllocation) == encodeAndHashAllocation(newCommitment.currentAllocation) &&
+      encodeAndHashAddressArray(oldCommitment.currentDestination) == encodeAndHashAddressArray(newCommitment.currentDestination) &&
+      encodeAndHashAddressArray(oldCommitment.currentToken) == encodeAndHashAddressArray(newCommitment.currentToken)
+    );
+  }
+
+  function hasFurtherVotesNeededBeenInitialized(
+      ConsensusCommitment.ConsensusCommitmentStruct memory commitment,
+      uint numParticipants
+  ) public pure returns (bool) {
+    return commitment.furtherVotesRequired == numParticipants - 1;
+  }
+
+  // helpers
+
+  function encodeAndHashAllocation(uint256[] memory allocation) internal pure returns (bytes32) {
+    return keccak256(abi.encode(allocation));
+  }
+
+  function encodeAndHashAddressArray(address[] memory destination) internal pure returns (bytes32) {
+    return keccak256(abi.encode(destination));
+  }
 }
