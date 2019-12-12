@@ -1,68 +1,12 @@
 pragma solidity ^0.5.2;
 pragma experimental ABIEncoderV2;
-import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "fmg-core/contracts/Commitment.sol";
 import "fmg-core/contracts/Rules.sol";
-
-contract IERC20 { // Abstraction of the parts of the ERC20 Interface that we need
-    function transfer(address to, uint tokens) public returns (bool success);
-    function transferFrom(address from, address to, uint tokens) public returns (bool success);
-}
-
-contract INitroLibrary { // Abstraction of the NitroLibrary contract
-
-    struct Outcome {
-    address[] destination;
-    uint256 finalizedAt;
-    Commitment.CommitmentStruct challengeCommitment;
-    // exactly one of the following two should be non-null
-    // guarantee channels
-    uint[] allocation;         // should be zero length in guarantee channels
-    address[] token;
-    }
-
-    struct Signature {
-    uint8 v;
-    bytes32 r;
-    bytes32 s;
-    }
-
-    function recoverSigner(bytes calldata _d, uint8 _v, bytes32 _r, bytes32 _s) external pure returns(address);
-
-    function affords(
-        address recipient,
-        Outcome calldata outcome,
-        uint funding,
-        address token
-    ) external pure returns (uint256);
-
-    function reprioritize(
-        Outcome calldata allocation,
-        Outcome calldata guarantee,
-        address token
-    ) external pure returns (Outcome memory);
-
-    function moveAuthorized(Commitment.CommitmentStruct calldata _commitment, Signature calldata signature) external pure returns (bool);
-
-    function reduce(
-        Outcome memory outcome,
-        address recipient,
-        uint amount,
-        address token
-    ) public pure returns (Outcome memory);
-}
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract NitroAdjudicator {
     using Commitment for Commitment.CommitmentStruct;
     using SafeMath for uint;
-    INitroLibrary Library; // Abs
-
-    constructor(address _NitroLibraryAddress) public {
-        Library = INitroLibrary(_NitroLibraryAddress); // Abs
-    }
-
-    // TODO: Challenge duration should depend on the channel
-    uint constant CHALLENGE_DURATION = 5 minutes;
 
     struct Authorization {
         // Prevents replay attacks:
@@ -76,88 +20,93 @@ contract NitroAdjudicator {
         address sender; // the account used to sign transactions
     }
 
-    struct ConclusionProof {
-        Commitment.CommitmentStruct penultimateCommitment;
-        INitroLibrary.Signature penultimateSignature; // Abs
-        Commitment.CommitmentStruct ultimateCommitment;
-        INitroLibrary.Signature ultimateSignature; // Abs
+    struct Outcome {
+        address[] destination;
+        uint256 finalizedAt;
+        Commitment.CommitmentStruct challengeCommitment;
+
+        // exactly one of the following two should be non-null
+        // guarantee channels
+        uint[] allocation;         // should be zero length in guarantee channels
     }
 
-    mapping(address => mapping(address => uint)) public holdings;
-    mapping(address => INitroLibrary.Outcome) internal outcomes; // Abs
+    struct Signature {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
+    struct ConclusionProof {
+        Commitment.CommitmentStruct penultimateCommitment;
+        Signature penultimateSignature;
+        Commitment.CommitmentStruct ultimateCommitment;
+        Signature ultimateSignature;
+    }
+
+    mapping(address => uint) public holdings;
+    mapping(address => Outcome) public outcomes;
     address private constant zeroAddress = address(0);
 
+    // TODO: Challenge duration should depend on the channel
+    uint constant CHALLENGE_DURATION = 5 minutes;
+
     // **************
-    // ETH and Token Management
+    // Eth Management
     // **************
 
-
-function deposit(address destination, uint expectedHeld,
- uint amount, address token) public payable {
-       if (token == zeroAddress) {
-        require(msg.value == amount, "Insufficient ETH for ETH deposit");
-        } else {
-            IERC20 _token = IERC20(token);
-            require(_token.transferFrom(msg.sender,address(this),amount), 'Could not deposit ERC20s');
-            }
-
+    function deposit(address destination, uint expectedHeld) public payable {
+        uint amount = msg.value;
         uint amountDeposited;
+
         // This protects against a directly funded channel being defunded due to chain re-orgs,
         // and allow a wallet implementation to ensure the safety of deposits.
         require(
-            holdings[destination][token] >= expectedHeld,
-            "Deposit: holdings[destination][token] is less than expected"
+            holdings[destination] >= expectedHeld,
+            "Deposit: holdings[destination] is less than expected"
         );
 
-        // If I expect there to be 10 and deposit 2, my goal was to get the
-        // balance to 12.
+
+        // If I expect there to be 10 eth and deposit 2, my goal was to get the
+        // balance to 12 eth.
         // In case some arbitrary person deposited 1 eth before I noticed, making the
-        // holdings 11, I should be refunded 1.
-        if (holdings[destination][token] == expectedHeld) {
+        // holdings 11 eth, I should be refunded 1 eth.
+        if (holdings[destination] == expectedHeld) {
             amountDeposited = amount;
-        } else if (holdings[destination][token] < expectedHeld.add(amount)) {
-            amountDeposited = expectedHeld.add(amount).sub(holdings[destination][token]);
+        } else if (holdings[destination] < expectedHeld.add(amount)) {
+            amountDeposited = expectedHeld.add(amount).sub(holdings[destination]);
         } else {
             amountDeposited = 0;
         }
-        holdings[destination][token] = holdings[destination][token].add(amountDeposited);
+
+        holdings[destination] = holdings[destination].add(amountDeposited);
         if (amountDeposited < amount) {
             // refund whatever wasn't deposited.
-            if (token == zeroAddress) {
-              msg.sender.transfer(amount - amountDeposited); // TODO use safeMath here
-          }
-            else {
-                IERC20 _token = IERC20(token);
-                _token.transfer(msg.sender, amount - amountDeposited); // TODO use safeMath here
-                // TODO compute amountDeposited *before* calling into erc20 contract, so we only need 1 call not 2
-                }
+            msg.sender.transfer(amount - amountDeposited);
         }
-        emit Deposited(destination, amountDeposited, holdings[destination][token]);
+
+        emit Deposited(destination, amountDeposited, holdings[destination]);
     }
 
     function transferAndWithdraw(address channel,
         address participant,
         address payable destination,
         uint amount,
-        address token,
         uint8 _v,
         bytes32 _r,
         bytes32 _s
     ) public payable {
-        transfer(channel, participant, amount, token);
-        withdraw(participant, destination, amount, token, _v, _r ,_s);
+        transfer(channel, participant, amount);
+        withdraw(participant, destination, amount, _v, _r ,_s);
     }
 
     function withdraw(address participant,
         address payable destination,
         uint amount,
-        address token,
         uint8 _v,
         bytes32 _r,
         bytes32 _s
     ) public payable {
         require(
-            holdings[participant][token] >= amount,
+            holdings[participant] >= amount,
             "Withdraw: overdrawn"
         );
         Authorization memory authorization = Authorization(
@@ -168,22 +117,15 @@ function deposit(address destination, uint expectedHeld,
         );
 
         require(
-            Library.recoverSigner(abi.encode(authorization), _v, _r, _s) == participant,
+            recoverSigner(abi.encode(authorization), _v, _r, _s) == participant,
             "Withdraw: not authorized by participant"
         );
 
-        holdings[participant][token] = holdings[participant][token].sub(amount);
-        // Decrease holdings before calling to token contract (protect against reentrancy)
-        if (token == zeroAddress) {destination.transfer(amount);}
-        else {
-            IERC20 _token = IERC20(token);
-            _token.transfer(destination,amount);
-            }
-
+        holdings[participant] = holdings[participant].sub(amount);
+        destination.transfer(amount);
     }
 
-
-    function transfer(address channel, address destination, uint amount, address token) public {
+    function transfer(address channel, address destination, uint amount) public {
         require(
             outcomes[channel].challengeCommitment.guaranteedChannel == zeroAddress,
             "Transfer: channel must be a ledger channel"
@@ -197,25 +139,163 @@ function deposit(address destination, uint expectedHeld,
             "Transfer: outcome must be present"
         );
 
-        uint channelAffordsForDestination = Library.affords(destination, outcomes[channel], holdings[channel][token], token);
+        uint channelAffordsForDestination = affords(destination, outcomes[channel], holdings[channel]);
 
         require(
             amount <= channelAffordsForDestination,
             "Transfer: channel cannot afford the requested transfer amount"
         );
 
-        holdings[destination][token] = holdings[destination][token] + amount;
-        holdings[channel][token] = holdings[channel][token] - amount;
-        outcomes[channel] = Library.reduce(outcomes[channel], destination, amount, token);
+        holdings[destination] = holdings[destination] + amount;
+        holdings[channel] = holdings[channel] - amount;
 
+        outcomes[channel] = reduce(outcomes[channel], destination, amount);
     }
 
+    function claim(address guarantor, address recipient, uint amount) public {
+        Outcome memory guarantee = outcomes[guarantor];
+        require(
+            guarantee.challengeCommitment.guaranteedChannel != zeroAddress,
+            "Claim: a guarantee channel is required"
+        );
+
+        require(
+            isChannelClosed(guarantor),
+            "Claim: channel must be closed"
+        );
+
+        uint funding = holdings[guarantor];
+        Outcome memory reprioritizedOutcome = reprioritize(
+            outcomes[guarantee.challengeCommitment.guaranteedChannel],
+            guarantee
+        );
+        if (affords(recipient, reprioritizedOutcome, funding) >= amount) {
+            outcomes[guarantee.challengeCommitment.guaranteedChannel] = reduce(
+                outcomes[guarantee.challengeCommitment.guaranteedChannel],
+                recipient,
+                amount
+            );
+            holdings[guarantor] = holdings[guarantor].sub(amount);
+            holdings[recipient] = holdings[recipient].add(amount);
+        } else {
+            revert('Claim: guarantor must be sufficiently funded');
+        }
+    }
+
+    // ********************
+    // Eth Management Logic
+    // ********************
+
+    function reprioritize(
+        Outcome memory allocation,
+        Outcome memory guarantee
+    ) internal pure returns (Outcome memory) {
+        require(
+            guarantee.challengeCommitment.guaranteedChannel != address(0),
+            "Claim: a guarantee channel is required"
+        );
+        address[] memory newDestination = new address[](guarantee.destination.length);
+        uint[] memory newAllocation = new uint[](guarantee.destination.length);
+        for (uint aIdx = 0; aIdx < allocation.destination.length; aIdx++) {
+            for (uint gIdx = 0; gIdx < guarantee.destination.length; gIdx++) {
+                if (guarantee.destination[gIdx] == allocation.destination[aIdx]) {
+                    newDestination[gIdx] = allocation.destination[aIdx];
+                    newAllocation[gIdx] = allocation.allocation[aIdx];
+                    break;
+                }
+            }
+        }
+
+        return Outcome(
+            newDestination,
+            allocation.finalizedAt,
+            allocation.challengeCommitment,
+            newAllocation
+        );
+    }
+
+    function affords(
+        address recipient,
+        Outcome memory outcome,
+        uint funding
+    ) internal pure returns (uint256) {
+        uint result = 0;
+        uint remainingFunding = funding;
+
+        for (uint i = 0; i < outcome.destination.length; i++) {
+            if (remainingFunding <= 0) {
+                break;
+            }
+
+            if (outcome.destination[i] == recipient) {
+                // It is technically allowed for a recipient to be listed in the
+                // outcome multiple times, so we must iterate through the entire
+                // array.
+                result = result.add(min(outcome.allocation[i], remainingFunding));
+            }
+            if (remainingFunding > outcome.allocation[i]){
+                remainingFunding = remainingFunding.sub(outcome.allocation[i]);
+            }else{
+                remainingFunding = 0;
+            }
+        }
+
+        return result;
+    }
+
+    function reduce(
+        Outcome memory outcome,
+        address recipient,
+        uint amount
+    ) internal pure returns (Outcome memory) {
+        uint256[] memory updatedAllocation = outcome.allocation;
+        uint256 reduction = 0;
+        uint remainingAmount = amount;
+        for (uint i = 0; i < outcome.destination.length; i++) {
+            if (outcome.destination[i] == recipient) {
+                // It is technically allowed for a recipient to be listed in the
+                // outcome multiple times, so we must iterate through the entire
+                // array.
+                reduction = reduction.add(min(outcome.allocation[i], remainingAmount));
+                remainingAmount = remainingAmount.sub(reduction);
+                updatedAllocation[i] = updatedAllocation[i].sub(reduction);
+            }
+        }
+
+        return Outcome(
+            outcome.destination,
+            outcome.finalizedAt,
+            outcome.challengeCommitment, // Once the outcome is finalized,
+            updatedAllocation
+        );
+    }
+
+    // ****************
+    // ForceMove Events
+    // ****************
+
+    event ChallengeCreated(
+        address channelId,
+        Commitment.CommitmentStruct commitment,
+        uint256 finalizedAt
+    );
+    event Concluded(address channelId);
+    event Refuted(address channelId, Commitment.CommitmentStruct refutation);
+    event RespondedWithMove(address channelId, Commitment.CommitmentStruct response, uint8 v, bytes32 r, bytes32 ss);
+    event RespondedWithAlternativeMove(Commitment.CommitmentStruct alternativeResponse);
+    event Deposited(address destination, uint256 amountDeposited, uint256 destinationHoldings);
+    // **********************
+    // ForceMove Protocol API
+    // **********************
+
+    function conclude(ConclusionProof memory proof) public {
+        _conclude(proof);
+    }
 
     function concludeAndWithdraw(ConclusionProof memory proof,
         address participant,
         address payable destination,
         uint amount,
-        address token,
         uint8 _v,
         bytes32 _r,
         bytes32 _s
@@ -227,69 +307,25 @@ function deposit(address destination, uint expectedHeld,
             require(keccak256(abi.encode(proof.penultimateCommitment)) == keccak256(abi.encode(outcomes[channelId].challengeCommitment)),
             "concludeAndWithdraw: channel already concluded with a different proof");
         }
-        transfer(channelId,participant, amount, token);
-        withdraw(participant,destination, amount, token, _v,_r,_s);
+        transfer(channelId,participant, amount);
+        withdraw(participant,destination, amount, _v,_r,_s);
     }
-
-    function claim(address guarantor, address recipient, uint amount, address token) public {
-        INitroLibrary.Outcome memory guarantee = outcomes[guarantor]; // Abs
-        require(
-            guarantee.challengeCommitment.guaranteedChannel != zeroAddress,
-            "Claim: a guarantee channel is required"
-        );
-
-        require(
-            isChannelClosed(guarantor),
-            "Claim: channel must be closed"
-        );
-
-        uint funding = holdings[guarantor][token];
-        INitroLibrary.Outcome memory reprioritizedOutcome = Library.reprioritize( // Abs
-            outcomes[guarantee.challengeCommitment.guaranteedChannel],
-            guarantee,
-            token
-        );
-        if (Library.affords(recipient, reprioritizedOutcome, funding, token) >= amount) {
-            outcomes[guarantee.challengeCommitment.guaranteedChannel] = Library.reduce(
-                outcomes[guarantee.challengeCommitment.guaranteedChannel],
-                recipient,
-                amount,
-                token
-            );
-            holdings[guarantor][token] = holdings[guarantor][token].sub(amount);
-            holdings[recipient][token] = holdings[recipient][token].add(amount);
-        } else {
-            revert('Claim: guarantor must be sufficiently funded');
-        }
-    }
-
-
-
-    // **********************
-    // ForceMove Protocol API
-    // **********************
-
-    function conclude(ConclusionProof memory proof) public {
-        _conclude(proof);
-    }
-
-
 
     function forceMove(
         Commitment.CommitmentStruct memory agreedCommitment,
         Commitment.CommitmentStruct memory challengeCommitment,
-        INitroLibrary.Signature[] memory signatures // Abs
+        Signature[] memory signatures
     ) public {
         require(
             !isChannelClosed(agreedCommitment.channelId()),
             "ForceMove: channel must be open"
         );
         require(
-            Library.moveAuthorized(agreedCommitment, signatures[0]),
+            moveAuthorized(agreedCommitment, signatures[0]),
             "ForceMove: agreedCommitment not authorized"
         );
         require(
-            Library.moveAuthorized(challengeCommitment, signatures[1]),
+            moveAuthorized(challengeCommitment, signatures[1]),
             "ForceMove: challengeCommitment not authorized"
         );
         require(
@@ -299,12 +335,11 @@ function deposit(address destination, uint expectedHeld,
 
         address channelId = agreedCommitment.channelId();
 
-        outcomes[channelId] = INitroLibrary.Outcome( // Abs
+        outcomes[channelId] = Outcome(
             challengeCommitment.participants,
             now + CHALLENGE_DURATION,
             challengeCommitment,
-            challengeCommitment.allocation,
-            challengeCommitment.token
+            challengeCommitment.allocation
         );
 
         emit ChallengeCreated(
@@ -314,7 +349,7 @@ function deposit(address destination, uint expectedHeld,
         );
     }
 
-    function refute(Commitment.CommitmentStruct memory refutationCommitment, INitroLibrary.Signature memory signature) public { // Abs
+    function refute(Commitment.CommitmentStruct memory refutationCommitment, Signature memory signature) public {
         address channel = refutationCommitment.channelId();
         require(
             !isChannelClosed(channel),
@@ -322,7 +357,7 @@ function deposit(address destination, uint expectedHeld,
         );
 
         require(
-            Library.moveAuthorized(refutationCommitment, signature),
+            moveAuthorized(refutationCommitment, signature),
             "Refute: move must be authorized"
         );
 
@@ -332,17 +367,16 @@ function deposit(address destination, uint expectedHeld,
         );
 
         emit Refuted(channel, refutationCommitment);
-        INitroLibrary.Outcome memory updatedOutcome = INitroLibrary.Outcome( // Abs
+        Outcome memory updatedOutcome = Outcome(
             outcomes[channel].destination,
             0,
             refutationCommitment,
-            refutationCommitment.allocation,
-            refutationCommitment.token
+            refutationCommitment.allocation
         );
         outcomes[channel] = updatedOutcome;
     }
 
-    function respondWithMove(Commitment.CommitmentStruct memory responseCommitment, INitroLibrary.Signature memory signature) public { // Abs
+    function respondWithMove(Commitment.CommitmentStruct memory responseCommitment, Signature memory signature) public {
         address channel = responseCommitment.channelId();
         require(
             !isChannelClosed(channel),
@@ -350,7 +384,7 @@ function deposit(address destination, uint expectedHeld,
         );
 
         require(
-            Library.moveAuthorized(responseCommitment, signature),
+            moveAuthorized(responseCommitment, signature),
             "RespondWithMove: move must be authorized"
         );
 
@@ -361,12 +395,11 @@ function deposit(address destination, uint expectedHeld,
 
         emit RespondedWithMove(channel, responseCommitment, signature.v, signature.r, signature.s);
 
-        INitroLibrary.Outcome memory updatedOutcome = INitroLibrary.Outcome( // Abs
+        Outcome memory updatedOutcome = Outcome(
             outcomes[channel].destination,
             0,
             responseCommitment,
-            responseCommitment.allocation,
-            responseCommitment.token
+            responseCommitment.allocation
         );
         outcomes[channel] = updatedOutcome;
     }
@@ -374,8 +407,8 @@ function deposit(address destination, uint expectedHeld,
     function alternativeRespondWithMove(
         Commitment.CommitmentStruct memory _alternativeCommitment,
         Commitment.CommitmentStruct memory _responseCommitment,
-        INitroLibrary.Signature memory _alternativeSignature, // Abs
-        INitroLibrary.Signature memory _responseSignature // Abs
+        Signature memory _alternativeSignature,
+        Signature memory _responseSignature
     )
       public
     {
@@ -386,7 +419,7 @@ function deposit(address destination, uint expectedHeld,
         );
 
         require(
-            Library.moveAuthorized(_responseCommitment, _responseSignature),
+            moveAuthorized(_responseCommitment, _responseSignature),
             "AlternativeRespondWithMove: move must be authorized"
         );
 
@@ -417,12 +450,11 @@ function deposit(address destination, uint expectedHeld,
 
         emit RespondedWithAlternativeMove(_responseCommitment);
 
-        INitroLibrary.Outcome memory updatedOutcome = INitroLibrary.Outcome( // Abs
+        Outcome memory updatedOutcome = Outcome(
             outcomes[channel].destination,
             0,
             _responseCommitment,
-            _responseCommitment.allocation,
-            _responseCommitment.token
+            _responseCommitment.allocation
         );
         outcomes[channel] = updatedOutcome;
     }
@@ -438,32 +470,48 @@ function deposit(address destination, uint expectedHeld,
             "Conclude: channel must not be finalized"
         );
 
-        outcomes[channelId] = INitroLibrary.Outcome( // Abs
+        outcomes[channelId] = Outcome(
             proof.penultimateCommitment.destination,
             now,
             proof.penultimateCommitment,
-            proof.penultimateCommitment.allocation,
-            proof.penultimateCommitment.token
+            proof.penultimateCommitment.allocation
         );
         emit Concluded(channelId);
     }
+
+    // ****************
+    // Helper functions
+    // ****************
 
     function isChannelClosed(address channel) internal view returns (bool) {
         return outcomes[channel].finalizedAt < now && outcomes[channel].finalizedAt > 0;
     }
 
-    // ****************
-    // Events
-    // ****************
-    event Deposited(address destination, uint256 amountDeposited, uint256 destinationHoldings);
+    function moveAuthorized(Commitment.CommitmentStruct memory _commitment, Signature memory signature) internal pure returns (bool){
+        return _commitment.mover() == recoverSigner(
+            abi.encode(_commitment),
+            signature.v,
+            signature.r,
+            signature.s
+        );
+    }
 
-    event ChallengeCreated(
-        address channelId,
-        Commitment.CommitmentStruct commitment,
-        uint256 finalizedAt
-    );
-    event Concluded(address channelId);
-    event Refuted(address channelId, Commitment.CommitmentStruct refutation);
-    event RespondedWithMove(address channelId, Commitment.CommitmentStruct response, uint8 v, bytes32 r, bytes32 ss);
-    event RespondedWithAlternativeMove(Commitment.CommitmentStruct alternativeResponse);
+    function recoverSigner(bytes memory _d, uint8 _v, bytes32 _r, bytes32 _s) internal pure returns(address) {
+        bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+        bytes32 h = keccak256(_d);
+
+        bytes32 prefixedHash = keccak256(abi.encodePacked(prefix, h));
+
+        address a = ecrecover(prefixedHash, _v, _r, _s);
+
+        return(a);
+    }
+
+    function min(uint a, uint b) internal pure returns (uint) {
+        if (a <= b) {
+            return a;
+        }
+
+        return b;
+    }
 }

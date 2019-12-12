@@ -134,12 +134,8 @@ contract ConsensusApp {
       "ConsensusApp: 'allocation' must be the same between commitments."
     );
     require(
-      encodeAndHashAddressArray(oldCommitment.currentDestination) == encodeAndHashAddressArray(newCommitment.currentDestination),
+      encodeAndHashDestination(oldCommitment.currentDestination) == encodeAndHashDestination(newCommitment.currentDestination),
       "ConsensusApp: 'destination' must be the same between commitments."
-    );
-        require(
-      encodeAndHashAddressArray(oldCommitment.currentToken) == encodeAndHashAddressArray(newCommitment.currentToken),
-      "ConsensusApp: 'token' must be the same between commitments."
     );
   }
 
@@ -151,13 +147,9 @@ contract ConsensusApp {
       encodeAndHashAllocation(oldCommitment.proposedAllocation) == encodeAndHashAllocation(newCommitment.proposedAllocation),
       "ConsensusApp: 'proposedAllocation' must be the same between commitments."
     );
-        require(
-      encodeAndHashAddressArray(oldCommitment.proposedDestination) == encodeAndHashAddressArray(newCommitment.proposedDestination),
-      "ConsensusApp: 'proposedDestination' must be the same between commitments."
-    );
     require(
-      encodeAndHashAddressArray(oldCommitment.proposedToken) == encodeAndHashAddressArray(newCommitment.proposedToken),
-      "ConsensusApp: 'proposedToken' must be the same between commitments."
+      encodeAndHashDestination(oldCommitment.proposedDestination) == encodeAndHashDestination(newCommitment.proposedDestination),
+      "ConsensusApp: 'proposedDestination' must be the same between commitments."
     );
   }
 
@@ -176,10 +168,6 @@ contract ConsensusApp {
       commitment.proposedDestination.length == 0,
       "ConsensusApp: 'proposedDestination' must be reset during consensus."
     );
-    require(
-      commitment.proposedToken.length == 0,
-      "ConsensusApp: 'proposedToken' must be reset during consensus."
-    );
   }
 
   function validateProposeCommitment(
@@ -193,10 +181,6 @@ contract ConsensusApp {
       commitment.proposedDestination.length > 0,
       "ConsensusApp: 'proposedDestination' must not be reset during propose."
       );
-    require(
-      commitment.proposedToken.length == commitment.proposedAllocation.length,
-      "ConsensusApp: 'proposedToken' must be the smae length as `proposedAllocation."
-    );
     require(
       commitment.proposedAllocation.length == 0 || // in case it's a guarantor channel
       commitment.proposedAllocation.length == commitment.proposedDestination.length,
@@ -230,8 +214,7 @@ contract ConsensusApp {
   ) private pure returns (bool) {
     return (
       encodeAndHashAllocation(oldCommitment.proposedAllocation) == encodeAndHashAllocation(newCommitment.currentAllocation) &&
-      encodeAndHashAddressArray(oldCommitment.proposedDestination) == encodeAndHashAddressArray(newCommitment.currentDestination) &&
-      encodeAndHashAddressArray(oldCommitment.proposedToken) == encodeAndHashAddressArray(newCommitment.currentToken)
+      encodeAndHashDestination(oldCommitment.proposedDestination) == encodeAndHashDestination(newCommitment.currentDestination)
     );
   }
 
@@ -241,8 +224,7 @@ contract ConsensusApp {
   ) private pure returns (bool) {
     return (
       encodeAndHashAllocation(oldCommitment.currentAllocation) == encodeAndHashAllocation(newCommitment.currentAllocation) &&
-      encodeAndHashAddressArray(oldCommitment.currentDestination) == encodeAndHashAddressArray(newCommitment.currentDestination) &&
-      encodeAndHashAddressArray(oldCommitment.currentToken) == encodeAndHashAddressArray(newCommitment.currentToken)
+      encodeAndHashDestination(oldCommitment.currentDestination) == encodeAndHashDestination(newCommitment.currentDestination)
     );
   }
 
@@ -259,7 +241,7 @@ contract ConsensusApp {
     return keccak256(abi.encode(allocation));
   }
 
-  function encodeAndHashAddressArray(address[] memory destination) internal pure returns (bytes32) {
+  function encodeAndHashDestination(address[] memory destination) internal pure returns (bytes32) {
     return keccak256(abi.encode(destination));
   }
 }
