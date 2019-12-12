@@ -13,13 +13,6 @@ import {setupContracts} from '../test-helpers';
 import {getTestProvider} from '../../src/index';
 import * as _ from 'lodash';
 
-console.log(process.env.TEST_NITRO_ADJUDICATOR_ADDRESS);
-console.log(process.env.TEST_NITRO_ADJUDICATOR_ADDRESS);
-console.log(process.env.TEST_NITRO_ADJUDICATOR_ADDRESS);
-console.log(process.env.TEST_NITRO_ADJUDICATOR_ADDRESS);
-console.log(process.env.TEST_NITRO_ADJUDICATOR_ADDRESS);
-console.log(process.env.TEST_NITRO_ADJUDICATOR_ADDRESS);
-
 jest.setTimeout(20000);
 let nitro: ethers.Contract;
 let CountingAppContract: ethers.Contract;
@@ -223,7 +216,7 @@ describe('nitroAdjudicator', () => {
 
   describe('Eth management', () => {
     describe('deposit', () => {
-      it.only('works', async () => {
+      it('works', async () => {
         const channelID = getChannelID(ledgerChannel);
         await depositTo(channelID);
         const allocatedAmount = await nitro.holdings(channelID);
