@@ -1,29 +1,23 @@
-import {ContractFactory, ethers} from 'ethers';
-import {
-  linkedByteCode,
-  expectRevert,
-  getNetworkId,
-  getGanacheProvider,
-  expectEvent,
-  increaseTime,
-  DURATION,
-} from 'magmo-devtools';
+import {ethers} from 'ethers';
+import {expectRevert} from '@statechannels/devtools';
 import {sign, Channel, CountingApp, toHex, asEthersObject, Address} from 'fmg-core';
 import {BigNumber, bigNumberify} from 'ethers/utils';
-import CommitmentArtifact from '../build/contracts/Commitment.json';
-import RulesArtifact from '../build/contracts/Rules.json';
-import testNitroAdjudicatorArtifact from '../build/contracts/TestNitroAdjudicator.json';
-import {getCountingApp} from './CountingApp';
+import countingAppArtifact from '../../build/contracts/CountingApp.json';
+import nitroAdjudicatorArtifact from '../../build/contracts/TestNitroAdjudicator.json';
 import {channelID as getChannelID} from 'fmg-core/lib/channel';
 import {asCoreCommitment} from 'fmg-core/lib/test-app/counting-app';
 import {CountingCommitment} from 'fmg-core/src/test-app/counting-app';
 import {fromParameters, CommitmentType} from 'fmg-core/lib/commitment';
 import {Commitment as CoreCommitment} from 'fmg-core/src/commitment';
+import {setupContracts} from '../test-helpers';
+import {getTestProvider} from '../../src/index';
+import * as _ from 'lodash';
 
 jest.setTimeout(20000);
 let nitro: ethers.Contract;
+let CountingAppContract: ethers.Contract;
 const abiCoder = new ethers.utils.AbiCoder();
-const provider = getGanacheProvider();
+const provider = getTestProvider();
 const providerSigner = provider.getSigner();
 
 const DEPOSIT_AMOUNT = ethers.utils.parseEther('100'); //
@@ -63,28 +57,17 @@ async function withdraw(
   });
 }
 
-async function setupContracts() {
-  const networkId = await getNetworkId();
-
-  testNitroAdjudicatorArtifact.bytecode = linkedByteCode(
-    testNitroAdjudicatorArtifact,
-    CommitmentArtifact,
-    networkId
+async function setupContractsLocal() {
+  nitro = await setupContracts(
+    provider,
+    nitroAdjudicatorArtifact,
+    process.env.TEST_NITRO_ADJUDICATOR_ADDRESS
   );
-  testNitroAdjudicatorArtifact.bytecode = linkedByteCode(
-    testNitroAdjudicatorArtifact,
-    RulesArtifact,
-    networkId
+  CountingAppContract = await setupContracts(
+    provider,
+    countingAppArtifact,
+    process.env.COUNTING_APP_ADDRESS
   );
-
-  const nitroFactory = await ContractFactory.fromSolidity(
-    testNitroAdjudicatorArtifact,
-    providerSigner
-  );
-  const deployTran = await nitroFactory.getDeployTransaction();
-  const estimate = await provider.estimateGas(deployTran);
-  nitro = await nitroFactory.deploy();
-  await nitro.deployed();
   const unwrap = ({challengeCommitment, finalizedAt}) => ({
     challengeCommitment,
     finalizedAt,
@@ -136,17 +119,14 @@ describe('nitroAdjudicator', () => {
   let commitment2alt;
   let conclusionProof;
 
-  let CountingAppContract;
-
   beforeAll(async () => {
-    await setupContracts();
+    await setupContractsLocal();
 
     // alice and bob are both funded by startGanache in magmo devtools.
     alice = new ethers.Wallet('0x5d862464fe9303452126c8bc94274b8c5f9874cbd219789b3eb2128075a76f72');
     bob = new ethers.Wallet('0xdf02719c4df8b9b8ac7f551fcb5d9ef48fa27eef7a66453879f4d8fdc6e78fb1');
     guarantor = ethers.Wallet.createRandom();
     aliceDest = ethers.Wallet.createRandom();
-    CountingAppContract = await getCountingApp();
 
     const participants = [alice.address, bob.address];
     const destination = [alice.address, bob.address];
@@ -923,14 +903,14 @@ describe('nitroAdjudicator', () => {
       challengee = alice;
       challenger = bob;
 
-      await setupContracts();
+      await setupContractsLocal();
     });
 
     beforeEach(async () => {
       await (await nitro.setOutcome(getChannelID(ledgerChannel), nullOutcome)).wait();
       // challenge doesn't exist at start of app
       expectedAssertions += 1;
-      expect(await nitro.isChannelClosedPub(getChannelID(ledgerChannel))).toBe(false);
+      // expect(await nitro.isChannelClosedPub(getChannelID(ledgerChannel))).toBe(false);
     });
 
     describe('concludeAndWithdraw', () => {
@@ -1711,3 +1691,62 @@ describe('nitroAdjudicator', () => {
     });
   });
 });
+
+const defaultMatcher = function(event) {
+  return true;
+};
+
+async function expectEvent(txOrTxResult, expectedEventName, expectedEventArgs = {}) {
+  // Usage:
+  // Pass a transaction result, in which case await is unnecessary
+  // expectEvent(txResult, 'EventName', { argName: value })
+  // OR
+  // pass a transaction object
+  // await expectEvent(await someContract.someFunction(), 'EventName', { argName: value })
+
+  let txResult = txOrTxResult;
+  if (txOrTxResult.wait) {
+    // in this case, we were passed the result of `await someContract.someFunction(args)`,
+    // which is the transasction got sent off, but hasn't yet been confirmed.
+    txResult = await txOrTxResult.wait();
+  }
+  const events = txResult.events;
+  const matchingEvents = events.filter(event => {
+    return event.event === expectedEventName && _.isMatch(event.args, expectedEventArgs);
+  });
+  expect(matchingEvents.length).toBeGreaterThan(0);
+}
+
+// From https://github.com/OpenZeppelin/zeppelin-solidity/blob/master/test/helpers/increaseTime.js
+Object.defineProperty(exports, '__esModule', {value: true});
+// Increases testrpc time by the passed duration in seconds
+function increaseTime(duration, provider) {
+  return new Promise(function(resolve, reject) {
+    provider.send('evm_increaseTime', [duration]).then(function() {
+      provider.send('evm_mine').then(function(res, err2) {
+        return err2 ? reject(err2) : resolve(res);
+      });
+    });
+  });
+}
+
+const DURATION = {
+  seconds: function(val) {
+    return val;
+  },
+  minutes: function(val) {
+    return val * this.seconds(60);
+  },
+  hours: function(val) {
+    return val * this.minutes(60);
+  },
+  days: function(val) {
+    return val * this.hours(24);
+  },
+  weeks: function(val) {
+    return val * this.days(7);
+  },
+  years: function(val) {
+    return val * this.days(365);
+  },
+};
