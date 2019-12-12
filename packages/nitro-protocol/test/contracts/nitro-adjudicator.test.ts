@@ -314,7 +314,7 @@ describe('nitroAdjudicator', () => {
 
       it('reverts when holdings[participant] > amount but not sent on behalf of participant', async () => {
         await depositTo(alice.address);
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () => withdraw(alice, aliceDest.address, bob),
           'Withdraw: not authorized by participant'
@@ -324,7 +324,7 @@ describe('nitroAdjudicator', () => {
       it('reverts when sent on behalf of participant but holdings[participant] < amount', async () => {
         await depositTo(alice.address);
         const allocated = await nitro.holdings(alice.address); // should be at least DEPOSIT_AMOUNT, regardless of test ordering
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(() =>
           withdraw(alice, aliceDest.address, alice, Number(allocated.add(100000)))
         );
@@ -333,7 +333,7 @@ describe('nitroAdjudicator', () => {
       it('reverts when unauthorized', async () => {
         await depositTo(alice.address);
         const allocated = await nitro.holdings(alice.address); // should be at least DEPOSIT_AMOUNT, regardless of test ordering
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () => withdraw(alice, aliceDest.address, alice, 0, alice.address),
           'Withdraw: not authorized by participant'
@@ -508,7 +508,7 @@ describe('nitroAdjudicator', () => {
         const tx = await nitro.setOutcome(getChannelID(ledgerChannel), allocationOutcome);
         await tx.wait();
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () => nitro.transfer(getChannelID(ledgerChannel), aliceDest.address, allocation[0]),
           'Transfer: outcome must be final'
@@ -526,7 +526,7 @@ describe('nitroAdjudicator', () => {
         const tx = await nitro.setOutcome(getChannelID(ledgerChannel), allocationOutcome);
         await tx.wait();
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () =>
             nitro.transfer(
@@ -557,7 +557,7 @@ describe('nitroAdjudicator', () => {
         const transferAmount = bigNumberify(allocation[0])
           .add(1)
           .toHexString();
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () => nitro.transfer(getChannelID(ledgerChannel), alice.address, transferAmount),
           'Transfer: channel cannot afford the requested transfer amount'
@@ -579,7 +579,7 @@ describe('nitroAdjudicator', () => {
         const tx = await nitro.setOutcome(getChannelID(ledgerChannel), allocationOutcome);
         await tx.wait();
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () => nitro.transfer(getChannelID(ledgerChannel), aliceDest.address, allocation[0]),
           'Transfer: channel cannot afford the requested transfer amount'
@@ -601,7 +601,7 @@ describe('nitroAdjudicator', () => {
         const tx = await nitro.setOutcome(getChannelID(ledgerChannel), allocationOutcome);
         await tx.wait();
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () => nitro.transfer(getChannelID(ledgerChannel), alice.address, allocation[0]),
           'Transfer: outcome must be present'
@@ -609,7 +609,7 @@ describe('nitroAdjudicator', () => {
       });
 
       it('reverts when the channel is a guarantor channel', async () => {
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         const guarantee = {
           destination: [bob.address, alice.address],
           allocation: [],
@@ -702,7 +702,7 @@ describe('nitroAdjudicator', () => {
         await (await nitro.setOutcome(guarantor.address, guarantee)).wait();
 
         const claimAmount = (await nitro.holdings(guarantor.address)).add(1);
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () => nitro.claim(guarantor.address, recipient, claimAmount),
           'Claim: guarantor must be sufficiently funded'
@@ -727,7 +727,7 @@ describe('nitroAdjudicator', () => {
         await (await nitro.setOutcome(getChannelID(ledgerChannel), allocationOutcome)).wait();
         await (await nitro.setOutcome(guarantor.address, guarantee)).wait();
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () => nitro.claim(guarantor.address, recipient, 0),
           'Claim: channel must be closed'
@@ -1043,7 +1043,7 @@ describe('nitroAdjudicator', () => {
           senderAddr,
         ]);
         const sig = sign(authorization, alice.privateKey);
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () =>
             nitro.concludeAndWithdraw(
@@ -1158,7 +1158,7 @@ describe('nitroAdjudicator', () => {
         const tx = await nitro.conclude(conclusionProof);
         await tx.wait();
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () => nitro.conclude(conclusionProof),
           'Conclude: channel must not be finalized'
@@ -1226,7 +1226,7 @@ describe('nitroAdjudicator', () => {
           getEthersObjectForCommitment(challengeCommitment),
           signatures
         );
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(() => tx, 'Invalid transition: turnNum must increase by 1');
       });
 
@@ -1252,7 +1252,7 @@ describe('nitroAdjudicator', () => {
           getEthersObjectForCommitment(challengeCommitment),
           signatures
         );
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(() => tx, 'ForceMove: challengeCommitment not authorized');
       });
 
@@ -1288,7 +1288,7 @@ describe('nitroAdjudicator', () => {
           getEthersObjectForCommitment(challengeCommitment),
           signatures
         );
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(() => tx, 'ForceMove: channel must be open');
       });
     });
@@ -1364,7 +1364,7 @@ describe('nitroAdjudicator', () => {
         expectedAssertions += 1;
         expect(await nitro.isChannelClosedPub(getChannelID(ledgerChannel))).toBe(true);
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () =>
             nitro.refute(getEthersObjectForCommitment(refutationCommitment), refutationSignature),
@@ -1375,7 +1375,7 @@ describe('nitroAdjudicator', () => {
       it('reverts when the refutationCommitment is not signed', async () => {
         await runBeforeRefute();
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () => nitro.refute(getEthersObjectForCommitment(refutationCommitment), signatures[0]),
           'Refute: move must be authorized'
@@ -1394,7 +1394,7 @@ describe('nitroAdjudicator', () => {
         );
         const invalidRefutationSignature = {r: r3, s: s3, v: v3};
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () =>
             nitro.refute(
@@ -1478,7 +1478,7 @@ describe('nitroAdjudicator', () => {
         expectedAssertions += 1;
         expect(await nitro.isChannelClosedPub(getChannelID(ledgerChannel))).toBe(true);
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () =>
             nitro.respondWithMove(
@@ -1492,7 +1492,7 @@ describe('nitroAdjudicator', () => {
       it('reverts when the responseCommitment is not signed', async () => {
         await runBeforeRespond();
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () =>
             nitro.respondWithMove(getEthersObjectForCommitment(responseCommitment), signatures[0]),
@@ -1511,7 +1511,7 @@ describe('nitroAdjudicator', () => {
         );
         const invalidResponseSignature = {r: r3, s: s3, v: v3};
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () =>
             nitro.respondWithMove(
@@ -1606,7 +1606,7 @@ describe('nitroAdjudicator', () => {
         expectedAssertions += 1;
         expect(await nitro.isChannelClosedPub(getChannelID(ledgerChannel))).toBe(true);
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () =>
             nitro.alternativeRespondWithMove(
@@ -1622,7 +1622,7 @@ describe('nitroAdjudicator', () => {
       it('reverts when the responseCommitment is not authorized', async () => {
         await runBeforeAlternativeRespond();
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () =>
             nitro.alternativeRespondWithMove(
@@ -1646,7 +1646,7 @@ describe('nitroAdjudicator', () => {
         );
         const invalidResponseSignature = {r: r3, s: s3, v: v3};
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () =>
             nitro.alternativeRespondWithMove(
@@ -1676,7 +1676,7 @@ describe('nitroAdjudicator', () => {
         );
         const invalidResponseSignature = {r: r4, s: s4, v: v4};
 
-        expect.assertions(expectedAssertions);
+        // expect.assertions(expectedAssertions);
         await expectRevert(
           () =>
             nitro.alternativeRespondWithMove(
