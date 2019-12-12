@@ -11,17 +11,17 @@ import {
   splitSignature,
 } from 'ethers/utils';
 
-import {hashChannelStorage} from '../src/contract/channel-storage';
-import {
-  Allocation,
-  AllocationAssetOutcome,
-  encodeAllocation,
-  encodeGuarantee,
-  Guarantee,
-  hashAssetOutcome,
-  Outcome,
-} from '../src/contract/outcome';
-import {hashState, State} from '../src/contract/state';
+// import {hashChannelStorage} from '../src/contract/channel-storage';
+// import {
+//   Allocation,
+//   AllocationAssetOutcome,
+//   encodeAllocation,
+//   encodeGuarantee,
+//   Guarantee,
+//   hashAssetOutcome,
+//   Outcome,
+// } from '../src/contract/outcome';
+// import {hashState, State} from '../src/contract/state';
 
 // Interfaces
 
@@ -70,34 +70,34 @@ export async function sign(wallet: ethers.Wallet, msgHash: string | Uint8Array) 
 
 export const nonParticipant = ethers.Wallet.createRandom();
 
-export const clearedChallengeHash = (turnNumRecord = 5) =>
-  hashChannelStorage({
-    turnNumRecord,
-    finalizesAt: 0,
-  });
+// export const clearedChallengeHash = (turnNumRecord = 5) =>
+//   hashChannelStorage({
+//     turnNumRecord,
+//     finalizesAt: 0,
+//   });
 
-export const ongoingChallengeHash = (turnNumRecord = 5) =>
-  hashChannelStorage({
-    turnNumRecord,
-    finalizesAt: 1e12,
-    challengerAddress: AddressZero,
-    outcome: [],
-  });
+// export const ongoingChallengeHash = (turnNumRecord = 5) =>
+//   hashChannelStorage({
+//     turnNumRecord,
+//     finalizesAt: 1e12,
+//     challengerAddress: AddressZero,
+//     outcome: [],
+//   });
 
-export const finalizedOutcomeHash = (
-  turnNumRecord = 5,
-  finalizesAt = 1,
-  outcome: Outcome = [],
-  state = undefined,
-  challengerAddress = undefined
-) =>
-  hashChannelStorage({
-    turnNumRecord,
-    finalizesAt,
-    outcome,
-    state,
-    challengerAddress,
-  });
+// export const finalizedOutcomeHash = (
+//   turnNumRecord = 5,
+//   finalizesAt = 1,
+//   outcome: Outcome = [],
+//   state = undefined,
+//   challengerAddress = undefined
+// ) =>
+//   hashChannelStorage({
+//     turnNumRecord,
+//     finalizesAt,
+//     outcome,
+//     state,
+//     challengerAddress,
+//   });
 
 export const newChallengeRegisteredEvent = (contract: ethers.Contract, channelId: string) => {
   const filter = contract.filters.ChallengeRegistered(channelId);
@@ -208,33 +208,33 @@ export async function sendTransaction(
   return await response.wait();
 }
 
-export function allocationToParams(allocation: Allocation) {
-  const allocationBytes = encodeAllocation(allocation);
-  let assetOutcomeHash;
-  if (allocation.length === 0) {
-    assetOutcomeHash = HashZero;
-  } else {
-    assetOutcomeHash = hashAssetOutcome(allocation);
-  }
-  return [allocationBytes, assetOutcomeHash];
-}
+// export function allocationToParams(allocation: Allocation) {
+//   const allocationBytes = encodeAllocation(allocation);
+//   let assetOutcomeHash;
+//   if (allocation.length === 0) {
+//     assetOutcomeHash = HashZero;
+//   } else {
+//     assetOutcomeHash = hashAssetOutcome(allocation);
+//   }
+//   return [allocationBytes, assetOutcomeHash];
+// }
 
-export function guaranteeToParams(guarantee: Guarantee) {
-  const guaranteeBytes = encodeGuarantee(guarantee);
+// export function guaranteeToParams(guarantee: Guarantee) {
+//   const guaranteeBytes = encodeGuarantee(guarantee);
 
-  const assetOutcomeHash = hashAssetOutcome(guarantee);
-  return [guaranteeBytes, assetOutcomeHash];
-}
+//   const assetOutcomeHash = hashAssetOutcome(guarantee);
+//   return [guaranteeBytes, assetOutcomeHash];
+// }
 
-export async function signStates(
-  states: State[],
-  wallets: Wallet[],
-  whoSignedWhat: number[]
-): Promise<Signature[]> {
-  const stateHashes = states.map(s => hashState(s));
-  const promises = wallets.map(async (w, i) => await sign(w, stateHashes[whoSignedWhat[i]]));
-  return Promise.all(promises);
-}
+// export async function signStates(
+//   states: State[],
+//   wallets: Wallet[],
+//   whoSignedWhat: number[]
+// ): Promise<Signature[]> {
+//   const stateHashes = states.map(s => hashState(s));
+//   const promises = wallets.map(async (w, i) => await sign(w, stateHashes[whoSignedWhat[i]]));
+//   return Promise.all(promises);
+// }
 
 // Recursively replaces any key with the value of that key in the addresses object
 // BigNumberify all numbers
@@ -293,46 +293,46 @@ export function checkMultipleHoldings(
 }
 
 // Check the assetOutcomeHash on multiple asset Hoders defined in the multipleHoldings object. Requires an array of the relevant contracts to be passed in.
-export function checkMultipleAssetOutcomeHashes(
-  channelId: string,
-  outcome: OutcomeShortHand,
-  contractsArray: Contract[]
-) {
-  Object.keys(outcome).forEach(assetHolder => {
-    const assetOutcome = outcome[assetHolder];
-    const allocationAfter = [];
-    Object.keys(assetOutcome).forEach(destination => {
-      const amount = assetOutcome[destination];
-      allocationAfter.push({destination, amount});
-    });
-    const [, expectedNewAssetOutcomeHash] = allocationToParams(allocationAfter);
-    contractsArray.forEach(async contract => {
-      if (contract.address === assetHolder) {
-        expect(await contract.assetOutcomeHashes(channelId)).toEqual(expectedNewAssetOutcomeHash);
-      }
-    });
-  });
-}
+// export function checkMultipleAssetOutcomeHashes(
+//   channelId: string,
+//   outcome: OutcomeShortHand,
+//   contractsArray: Contract[]
+// ) {
+//   Object.keys(outcome).forEach(assetHolder => {
+//     const assetOutcome = outcome[assetHolder];
+//     const allocationAfter = [];
+//     Object.keys(assetOutcome).forEach(destination => {
+//       const amount = assetOutcome[destination];
+//       allocationAfter.push({destination, amount});
+//     });
+//     const [, expectedNewAssetOutcomeHash] = allocationToParams(allocationAfter);
+//     contractsArray.forEach(async contract => {
+//       if (contract.address === assetHolder) {
+//         expect(await contract.assetOutcomeHashes(channelId)).toEqual(expectedNewAssetOutcomeHash);
+//       }
+//     });
+//   });
+// }
 
 // Computes an outcome from a shorthand description
-export function computeOutcome(outcomeShortHand: OutcomeShortHand): AllocationAssetOutcome[] {
-  const outcome: AllocationAssetOutcome[] = [];
-  Object.keys(outcomeShortHand).forEach(assetHolder => {
-    const allocation: Allocation = [];
-    Object.keys(outcomeShortHand[assetHolder]).forEach(destination =>
-      allocation.push({
-        destination,
-        amount: bigNumberify(outcomeShortHand[assetHolder][destination]).toHexString(),
-      })
-    );
-    const assetOutcome: AllocationAssetOutcome = {
-      assetHolderAddress: assetHolder,
-      allocation,
-    }; // TODO handle gurantee outcomes
-    outcome.push(assetOutcome);
-  });
-  return outcome;
-}
+// export function computeOutcome(outcomeShortHand: OutcomeShortHand): AllocationAssetOutcome[] {
+//   const outcome: AllocationAssetOutcome[] = [];
+//   Object.keys(outcomeShortHand).forEach(assetHolder => {
+//     const allocation: Allocation = [];
+//     Object.keys(outcomeShortHand[assetHolder]).forEach(destination =>
+//       allocation.push({
+//         destination,
+//         amount: bigNumberify(outcomeShortHand[assetHolder][destination]).toHexString(),
+//       })
+//     );
+//     const assetOutcome: AllocationAssetOutcome = {
+//       assetHolderAddress: assetHolder,
+//       allocation,
+//     }; // TODO handle gurantee outcomes
+//     outcome.push(assetOutcome);
+//   });
+//   return outcome;
+// }
 
 export function assetTransferredEventsFromPayouts(
   channelId: string,
