@@ -215,7 +215,7 @@ describe('nitroAdjudicator', () => {
 
   describe('Eth management', () => {
     describe('deposit', () => {
-      it.only('works', async () => {
+      it('works', async () => {
         const channelID = getChannelID(ledgerChannel);
         await depositTo(channelID);
         const allocatedAmount = await nitro.holdings(channelID);
