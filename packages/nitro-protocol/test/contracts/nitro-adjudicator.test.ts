@@ -9,8 +9,7 @@ import {asCoreCommitment} from 'fmg-core/lib/test-app/counting-app';
 import {CountingCommitment} from 'fmg-core/src/test-app/counting-app';
 import {fromParameters, CommitmentType} from 'fmg-core/lib/commitment';
 import {Commitment as CoreCommitment} from 'fmg-core/src/commitment';
-import {setupContracts} from '../test-helpers';
-import {getTestProvider} from '../../src/index';
+import {setupContracts, getTestProvider} from '../test-helpers';
 import * as _ from 'lodash';
 
 jest.setTimeout(20000);
@@ -216,7 +215,7 @@ describe('nitroAdjudicator', () => {
 
   describe('Eth management', () => {
     describe('deposit', () => {
-      it('works', async () => {
+      it.only('works', async () => {
         const channelID = getChannelID(ledgerChannel);
         await depositTo(channelID);
         const allocatedAmount = await nitro.holdings(channelID);

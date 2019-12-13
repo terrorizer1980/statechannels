@@ -132,7 +132,11 @@ export class GasReporter implements jest.Reporter {
   }
 
   parseCode(parsedArtifact: ParsedArtifact, contractCalls: ContractCalls): void {
-    const lookup = {};
+    const lookup = {
+      Rules: process.env.RULES_ADDRESS,
+      Commitment: process.env.COMMITMENT_ADDRESS,
+      SafeMath: process.env.SAFE_MATH_ADDRESS
+    };
     for (const contractName of Object.keys(contractCalls)) {
       if (contractCalls[contractName].address) {
         lookup[contractName] = contractCalls[contractName].address;
