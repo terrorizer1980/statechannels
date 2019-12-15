@@ -11,6 +11,7 @@ import {fromParameters, CommitmentType} from 'fmg-core/lib/commitment';
 import {Commitment as CoreCommitment} from 'fmg-core/src/commitment';
 import {setupContracts, getTestProvider} from '../test-helpers';
 import * as _ from 'lodash';
+import fs from 'fs';
 
 jest.setTimeout(20000);
 let nitro: ethers.Contract;
@@ -217,7 +218,9 @@ describe('nitroAdjudicator', () => {
     describe('deposit', () => {
       it('works', async () => {
         const channelID = getChannelID(ledgerChannel);
-        await depositTo(channelID);
+        const tx = await depositTo(channelID);
+        const receipt = await tx.wait();
+        writeGasConsumption('deposit.legacy.gas.md', 'works', receipt.gasUsed);
         const allocatedAmount = await nitro.holdings(channelID);
 
         expect(allocatedAmount).toEqual(DEPOSIT_AMOUNT);
@@ -964,7 +967,12 @@ describe('nitroAdjudicator', () => {
           sig.s,
           {gasLimit: 3000000}
         );
-        await tx.wait();
+        const receipt = await tx.wait();
+        writeGasConsumption(
+          'concludeAndWithdraw.legacy.gas.md',
+          'works when the channel is not concluded',
+          receipt.gasUsed
+        );
         const outcomeAfterConclude = await nitro.getOutcome(getChannelID(ledgerChannel));
         expect(
           asEthersObject(fromParameters(outcomeAfterConclude.challengeCommitment))
@@ -1190,7 +1198,12 @@ describe('nitroAdjudicator', () => {
           getEthersObjectForCommitment(challengeCommitment),
           signatures
         );
-        const {events} = await tx.wait();
+        const {events, gasUsed} = await tx.wait();
+        writeGasConsumption(
+          'forceMove.legacy.gas.md',
+          'works when the channel is not concluded',
+          gasUsed
+        );
 
         expect(await nitro.isChallengeOngoing(getChannelID(ledgerChannel))).toBe(true);
 
@@ -1456,14 +1469,19 @@ describe('nitroAdjudicator', () => {
 
       it('works', async () => {
         await runBeforeRespond();
-
-        await expectEvent(
-          await nitro.respondWithMove(
-            getEthersObjectForCommitment(responseCommitment),
-            responseSignature
-          ),
-          'RespondedWithMove'
+        const tx = await nitro.respondWithMove(
+          getEthersObjectForCommitment(responseCommitment),
+          responseSignature
         );
+        const receipt = await tx.wait();
+
+        writeGasConsumption(
+          'respond.legacy.gas.md',
+          'works when the channel is not concluded',
+          receipt.gasUsed
+        );
+
+        await expectEvent(tx, 'RespondedWithMove');
 
         // "challenge should be cancelled
         expect(await nitro.isChallengeOngoing(getChannelID(ledgerChannel))).toBe(false);
@@ -1749,3 +1767,14 @@ const DURATION = {
     return val * this.days(365);
   },
 };
+
+async function writeGasConsumption(
+  filename: string,
+  description: string,
+  gas: BigNumber
+): Promise<void> {
+  await fs.appendFile(filename, description + ':\n' + gas.toString() + ' gas\n\n', err => {
+    if (err) throw err;
+    console.log('Wrote gas info to ' + filename);
+  });
+}
