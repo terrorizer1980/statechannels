@@ -1,7 +1,5 @@
 import {Machine, interpret} from 'xstate';
 
-const sufficientFunds = true;
-
 const PlayerAStates = {
   initial: 'GameChosen',
   states: {
@@ -31,7 +29,12 @@ const PlayerBStates = {
     OpponentJoined: {on: {START_ROUND: 'ChooseWeapon'}},
     ChooseWeapon: {on: {CHOOSE_WEAPON: 'WeaponChosen'}},
     WeaponChosen: {
-      on: {RESULT_ARRIVED: 'ResultPlayAgain', RESULT_ARRIVED2: 'InsufficientFunds'},
+      on: {
+        RESULT_ARRIVED: [
+          {target: 'ResultPlayAgain', cond: 'sufficientFunds'},
+          {target: 'InsufficientFunds', cond: 'insufficientFunds'},
+        ],
+      },
     },
     ResultPlayAgain: {on: {PLAY_AGAIN: 'WaitForRestart'}},
     WaitForRestart: {on: {START_ROUND: 'ChooseWeapon'}},
@@ -40,8 +43,7 @@ const PlayerBStates = {
   },
 };
 
-const setupMachine = Machine({
-  id: 'Setup',
+const game = {
   initial: 'Empty',
   states: {
     Empty: {
@@ -68,15 +70,14 @@ const setupMachine = Machine({
       on: {GAME_OVER: 'GameOver'},
       ...PlayerBStates,
     },
-    GameOver: {},
+    GameOver: {on: {EXIT_TO_LOBBY: 'Lobby'}},
+  },
+};
+
+const rps = Machine({
+  id: 'rps',
+  type: 'parallel',
+  states: {
+    game,
   },
 });
-
-const promiseService = interpret(promiseMachine).onTransition(state => console.log(state.value));
-
-// Start the service
-promiseService.start();
-// => 'pending'
-
-promiseService.send('RESOLVE');
-// => 'resolved'
