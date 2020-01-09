@@ -1,5 +1,34 @@
 import {Machine, interpret} from 'xstate';
 
+const PlayerAStates = {
+  initial: 'GameChosen',
+  states: {
+    GameChosen: {},
+    ChooseWeapon: {},
+    WeaponChosen: {},
+    WeaponAndSaltChosen: {},
+    ResultPlayAgain: {},
+    WaitForRestart: {},
+    InsufficientFunds: {},
+    Resigned: {},
+  },
+};
+
+const PlayerBStates = {
+  initial: 'CreatingOpenGame',
+  states: {
+    CreatingOpenGame: {},
+    WaitingRoom: {},
+    OpponentJoined: {},
+    ChooseWeapon: {},
+    WeaponChosen: {},
+    InsufficientFunds: {},
+    ResultPlayAgain: {},
+    WaitForRestart: {},
+    Resigned: {},
+  },
+};
+
 const setupMachine = Machine({
   id: 'Setup',
   initial: 'Empty',
@@ -20,8 +49,12 @@ const setupMachine = Machine({
         CREATE_OPEN_GAME: 'PlayerB',
       },
     },
-    PlayerA: {},
-    PlayerB: {},
+    PlayerA: {
+      ...PlayerAStates,
+    },
+    PlayerB: {
+      ...PlayerBStates,
+    },
   },
 });
 
