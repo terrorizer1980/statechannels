@@ -1,5 +1,6 @@
 import {Machine, interpret} from 'xstate';
 
+// game machine
 const PlayerAStates = {
   initial: 'GameChosen',
   states: {
@@ -74,10 +75,82 @@ const game = {
   },
 };
 
+// global machine
+const rules = {
+  initial: 'invisible',
+  states: {
+    visible: {on: {TOGGLE_RULES: 'invisible'}},
+    invisible: {on: {TOGGLE_RULES: 'visible'}},
+  },
+};
+const wallet = {
+  initial: 'invisible',
+  states: {
+    visible: {on: {HIDE_WALLET: 'invisible'}},
+    invisible: {on: {SHOW_WALLET: 'visible'}},
+  },
+};
+const global = {
+  type: 'parallel',
+  states: {
+    rules,
+    wallet,
+  },
+};
+
+// login machine
+const loading = {
+  initial: 'false',
+  states: {
+    true: {},
+    false: {},
+  },
+};
+const loggedIn = {
+  initial: 'false',
+  states: {
+    true: {},
+    false: {},
+  },
+};
+const login = {
+  type: 'parallel',
+  states: {
+    loading,
+    loggedIn,
+  },
+};
+
+// metamask machine
+const metamaskLoading = {
+  initial: 'false',
+  states: {
+    true: {},
+    false: {},
+  },
+};
+const metamaskSuccess = {
+  initial: 'false',
+  states: {
+    true: {},
+    false: {},
+  },
+};
+const metamask = {
+  type: 'parallel',
+  states: {
+    metamaskLoading,
+    metamaskSuccess,
+  },
+};
+
 const rps = Machine({
   id: 'rps',
   type: 'parallel',
   states: {
     game,
+    global,
+    login,
+    metamask,
   },
 });
