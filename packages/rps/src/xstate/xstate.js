@@ -1,4 +1,4 @@
-import {Machine, interpret} from 'xstate';
+import {Machine} from 'xstate';
 
 // game machine
 const PlayerAStates = {
@@ -102,15 +102,15 @@ const global = {
 const loading = {
   initial: 'false',
   states: {
-    true: {},
-    false: {},
+    true: {on: {LOGIN_SUCCESS: 'false'}},
+    false: {on: {LOGIN_REQUEST: 'true'}},
   },
 };
 const loggedIn = {
   initial: 'false',
   states: {
     true: {},
-    false: {},
+    false: {on: {LOGIN_SUCCESS: 'true'}},
   },
 };
 const login = {
@@ -144,7 +144,7 @@ const metamask = {
   },
 };
 
-const rps = Machine({
+export const rps = Machine({
   id: 'rps',
   type: 'parallel',
   states: {
