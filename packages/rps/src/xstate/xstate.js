@@ -1,14 +1,23 @@
 import {Machine, interpret} from 'xstate';
 
+const sufficientFunds = true;
+
 const PlayerAStates = {
   initial: 'GameChosen',
   states: {
-    GameChosen: {},
-    ChooseWeapon: {},
-    WeaponChosen: {},
-    WeaponAndSaltChosen: {},
-    ResultPlayAgain: {},
-    WaitForRestart: {},
+    GameChosen: {on: {START_ROUND: 'ChooseWeapon'}},
+    ChooseWeapon: {on: {CHOOSE_WEAPON: 'WeaponChosen'}},
+    WeaponChosen: {on: {CHOOSE_SALT: 'WeaponAndSaltChosen'}},
+    WeaponAndSaltChosen: {
+      on: {
+        RESULT_ARRIVED: [
+          {target: 'ResultPlayAgain', cond: 'sufficientFunds'},
+          {target: 'InsufficientFunds', cond: 'insufficientFunds'},
+        ],
+      },
+    },
+    ResultPlayAgain: {on: {PLAY_AGAIN: 'WaitForRestart'}},
+    WaitForRestart: {on: {START_ROUND: 'ChooseWeapon'}},
     InsufficientFunds: {},
     Resigned: {},
   },
@@ -17,14 +26,16 @@ const PlayerAStates = {
 const PlayerBStates = {
   initial: 'CreatingOpenGame',
   states: {
-    CreatingOpenGame: {},
-    WaitingRoom: {},
-    OpponentJoined: {},
-    ChooseWeapon: {},
-    WeaponChosen: {},
+    CreatingOpenGame: {on: {CREATE_GAME: 'WaitingRoom'}},
+    WaitingRoom: {on: {GAME_JOINED: 'OpponentJoined'}},
+    OpponentJoined: {on: {START_ROUND: 'ChooseWeapon'}},
+    ChooseWeapon: {on: {CHOOSE_WEAPON: 'WeaponChosen'}},
+    WeaponChosen: {
+      on: {RESULT_ARRIVED: 'ResultPlayAgain', RESULT_ARRIVED2: 'InsufficientFunds'},
+    },
+    ResultPlayAgain: {on: {PLAY_AGAIN: 'WaitForRestart'}},
+    WaitForRestart: {on: {START_ROUND: 'ChooseWeapon'}},
     InsufficientFunds: {},
-    ResultPlayAgain: {},
-    WaitForRestart: {},
     Resigned: {},
   },
 };
@@ -50,11 +61,14 @@ const setupMachine = Machine({
       },
     },
     PlayerA: {
+      on: {GAME_OVER: 'GameOver'},
       ...PlayerAStates,
     },
     PlayerB: {
+      on: {GAME_OVER: 'GameOver'},
       ...PlayerBStates,
     },
+    GameOver: {},
   },
 });
 
