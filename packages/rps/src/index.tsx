@@ -17,6 +17,13 @@ export const service = interpret(rps).onTransition(state => {
 // Start the service
 service.start();
 
+const oldDispatch = store.dispatch;
+const newDispatch = (action: any) => {
+  service.send(action);
+  return oldDispatch(action);
+};
+store.dispatch = newDispatch;
+
 render(
   <Provider store={store}>
     <div style={{width: '100%'}}>
