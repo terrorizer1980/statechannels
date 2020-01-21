@@ -49,7 +49,7 @@ const game = {
   states: {
     Empty: {
       on: {
-        UPDATE_PROFILE: 'NeedAddress',
+        UpdateProfile: 'NeedAddress',
       },
     },
     NeedAddress: {

@@ -11,7 +11,7 @@ import store from './redux/store';
 import SiteContainer from './containers/SiteContainer';
 
 // Interpret the machine, and add a listener for whenever a transition occurs.
-export const service = interpret(rps).onTransition(state => {
+export const service = interpret(rps, {devTools: true}).onTransition(state => {
   console.log(state.value);
 });
 // Start the service
