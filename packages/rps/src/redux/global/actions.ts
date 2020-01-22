@@ -15,3 +15,5 @@ export const hideWallet = () => ({
   type: HIDE_WALLET as typeof HIDE_WALLET,
 });
 export type hideWallet = ReturnType<typeof hideWallet>;
+
+export type GlobalAction = showWallet | hideWallet | ToggleRulesVisibility;
