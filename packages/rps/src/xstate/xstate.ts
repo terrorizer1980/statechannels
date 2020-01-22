@@ -4,7 +4,6 @@ type TContext = any;
 interface TState {
   value: any;
   context: any;
-  type: 'parallel' | 'atomic' | 'compound' | 'final' | 'history';
 }
 type TEvent = any;
 
@@ -99,7 +98,6 @@ const wallet = {
   },
 };
 const global = {
-  // type: 'parallel',
   states: {
     rules,
     wallet,
@@ -122,7 +120,6 @@ const loggedIn = {
   },
 };
 const login = {
-  // type: 'parallel',
   states: {
     loading,
     loggedIn,
