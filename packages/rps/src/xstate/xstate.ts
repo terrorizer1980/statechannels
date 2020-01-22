@@ -1,4 +1,12 @@
-import {Machine} from 'xstate';
+import {createMachine} from 'xstate';
+
+type TContext = any;
+interface TState {
+  value: any;
+  context: any;
+  type: 'parallel' | 'atomic' | 'compound' | 'final' | 'history';
+}
+type TEvent = any;
 
 // game machine
 const PlayerAStates = {
@@ -91,7 +99,7 @@ const wallet = {
   },
 };
 const global = {
-  type: 'parallel',
+  // type: 'parallel',
   states: {
     rules,
     wallet,
@@ -114,7 +122,7 @@ const loggedIn = {
   },
 };
 const login = {
-  type: 'parallel',
+  // type: 'parallel',
   states: {
     loading,
     loggedIn,
@@ -137,14 +145,15 @@ const metamaskSuccess = {
   },
 };
 const metamask = {
-  type: 'parallel',
+  value: 'metamask',
+  context: {},
   states: {
     metamaskLoading,
     metamaskSuccess,
   },
 };
 
-export const rps = Machine({
+export const rps = createMachine<TContext, TEvent, TState>({
   id: 'rps',
   type: 'parallel',
   states: {
