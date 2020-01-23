@@ -3,6 +3,7 @@ import {GameAction} from 'src/redux/game/actions';
 import {GlobalAction} from 'src/redux/global/actions';
 import {AnyAction} from 'src/redux/login/actions';
 import {MetamaskAction} from 'src/redux/metamask/actions';
+import {MetamaskState} from 'src/redux/metamask/state';
 
 type TContext = any;
 interface TState {
@@ -106,7 +107,7 @@ const game: StateNodeConfig<TContext, GameSchema, GameAction> = {
     Lobby: {
       on: {
         JoinOpenGame: 'PlayerA',
-        CreateGame: 'PlayerB',
+        NewOpenGame: 'PlayerB',
       },
     },
     PlayerA: {
@@ -150,6 +151,7 @@ const wallet: StateNodeConfig<TContext, VisibilitySchema, GlobalAction> = {
   },
 };
 const global: StateNodeConfig<TContext, GlobalSchema, GlobalAction> = {
+  type: 'parallel',
   states: {
     rules,
     wallet,
@@ -178,6 +180,7 @@ const loggedIn: StateNodeConfig<TContext, BooleanSchema, AnyAction> = {
   },
 };
 const login: StateNodeConfig<TContext, LoadingSchema, AnyAction> = {
+  initial: 'loading',
   states: {
     loading,
     loggedIn,
@@ -195,32 +198,14 @@ interface BooleanSchema {
 
 interface MMStateSchema {
   states: {
-    metamaskLoading: any;
-    metamaskSuccess: any;
+    metamaskState: {context: MetamaskState};
   };
 }
 
-const metamaskLoading: StateNodeConfig<TContext, BooleanSchema, MetamaskAction> = {
-  initial: 'false',
-  states: {
-    true: {},
-    false: {},
-  },
-};
-
-const metamaskSuccess: StateNodeConfig<TContext, BooleanSchema, MetamaskAction> = {
-  initial: 'false',
-  states: {
-    true: {},
-    false: {},
-  },
-};
-
 const metamask: StateNodeConfig<TContext, MMStateSchema, MetamaskAction> = {
-  initial: 'metamaskLoading',
+  initial: 'metamaskState',
   states: {
-    metamaskLoading,
-    metamaskSuccess,
+    metamaskState: {},
   },
 };
 
