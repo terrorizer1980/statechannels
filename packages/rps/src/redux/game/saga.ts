@@ -1,4 +1,4 @@
-import {select, call, put, take, actionChannel} from 'redux-saga/effects';
+import {select, call, put as oldPut, take, actionChannel} from 'redux-saga/effects';
 import {RPSChannelClient} from '../../utils/rps-channel-client';
 import {
   AppData,
@@ -17,6 +17,12 @@ import * as ls from './state';
 import {randomHex} from '../../utils/randomHex';
 import {bigNumberify} from 'ethers/utils';
 import {buffers} from 'redux-saga';
+import {service} from '../../';
+
+function* put(action: any) {
+  yield oldPut(action);
+  yield service.send(action);
+}
 
 let opponentResigned;
 opponentResigned = false;
