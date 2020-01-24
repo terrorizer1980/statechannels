@@ -1,12 +1,6 @@
 import {Reducer} from 'redux';
 import * as loginActions from './actions';
-
-export interface LoginState {
-  loading: boolean;
-  loggedIn: boolean;
-  user: any;
-  error: string | undefined;
-}
+import {LoginState} from './state';
 
 const initialState: LoginState = {
   loading: false,

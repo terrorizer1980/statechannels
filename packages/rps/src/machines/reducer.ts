@@ -1,6 +1,5 @@
 import {combineReducers} from 'redux';
-
-import {loginReducer, LoginState} from './login/reducer';
+import {loginReducer} from './login/reducer';
 import {metamaskReducer} from './metamask/reducer';
 import {MetamaskState} from './metamask/state';
 import {OpenGameState} from './open-games/state';
@@ -10,6 +9,7 @@ import {OverlayState} from './global/state';
 import {GameState} from './game/state';
 import {gameReducer} from './game/reducer';
 import {WalletState, walletReducer} from './wallet/reducer';
+import {LoginState} from './login/state';
 
 export interface SiteState {
   login: LoginState;

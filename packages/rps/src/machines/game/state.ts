@@ -1,4 +1,8 @@
 import {ChannelState, Result, Weapon} from '../../core';
+import {StateNodeConfig} from 'xstate';
+import {GameAction} from './actions';
+
+type TContext = any;
 
 export interface GameState {
   localState: LocalState;
@@ -366,3 +370,114 @@ export namespace EndGame {
     };
   };
 }
+
+// xstate
+// game machine
+interface PlayerASchema {
+  states: {
+    GameChosen: any;
+    ChooseWeapon: any;
+    WeaponChosen: any;
+    WeaponAndSaltChosen: any;
+    ResultPlayAgain: any;
+    WaitForRestart: any;
+    InsufficientFunds: any;
+    Resigned: any;
+  };
+}
+const PlayerAStates: StateNodeConfig<TContext, PlayerASchema, GameAction> = {
+  initial: 'GameChosen',
+  states: {
+    GameChosen: {on: {StartRound: 'ChooseWeapon'}},
+    ChooseWeapon: {on: {ChooseWeapon: 'WeaponChosen'}},
+    WeaponChosen: {on: {ChooseSalt: 'WeaponAndSaltChosen'}},
+    WeaponAndSaltChosen: {
+      on: {
+        ResultArrived: [
+          {target: 'ResultPlayAgain', cond: 'sufficientFunds'},
+          {target: 'InsufficientFunds', cond: 'insufficientFunds'},
+        ],
+      },
+    },
+    ResultPlayAgain: {on: {PlayAgain: 'WaitForRestart'}},
+    WaitForRestart: {on: {StartRound: 'ChooseWeapon'}},
+    InsufficientFunds: {},
+    Resigned: {},
+  },
+};
+
+interface PlayerBSchema {
+  states: {
+    CreatingOpenGame: any;
+    WaitingRoom: any;
+    OpponentJoined: any;
+    ChooseWeapon: any;
+    WeaponChosen: any;
+    ResultPlayAgain: any;
+    WaitForRestart: any;
+    InsufficientFunds: any;
+    Resigned: any;
+  };
+}
+const PlayerBStates: StateNodeConfig<TContext, PlayerBSchema, GameAction> = {
+  initial: 'CreatingOpenGame',
+  states: {
+    CreatingOpenGame: {on: {CreateGame: 'WaitingRoom'}},
+    WaitingRoom: {on: {GameJoined: 'OpponentJoined'}},
+    OpponentJoined: {on: {StartRound: 'ChooseWeapon'}},
+    ChooseWeapon: {on: {ChooseWeapon: 'WeaponChosen'}},
+    WeaponChosen: {
+      on: {
+        ResultArrived: [
+          {target: 'ResultPlayAgain', cond: 'sufficientFunds'},
+          {target: 'InsufficientFunds', cond: 'insufficientFunds'},
+        ],
+      },
+    },
+    ResultPlayAgain: {on: {PlayAgain: 'WaitForRestart'}},
+    WaitForRestart: {on: {StartRound: 'ChooseWeapon'}},
+    InsufficientFunds: {},
+    Resigned: {},
+  },
+};
+
+interface GameSchema {
+  states: {
+    Empty: any;
+    NeedAddress: any;
+    Lobby: any;
+    PlayerA: PlayerASchema;
+    PlayerB: PlayerBSchema;
+    GameOver: any;
+  };
+}
+export const game: StateNodeConfig<TContext, GameSchema, GameAction> = {
+  initial: 'Empty',
+  states: {
+    Empty: {
+      on: {
+        UpdateProfile: 'NeedAddress',
+      },
+    },
+    NeedAddress: {
+      on: {
+        GotAddressFromWallet: 'Lobby',
+      },
+    },
+    Lobby: {
+      on: {
+        JoinOpenGame: 'PlayerA',
+        NewOpenGame: 'PlayerB',
+      },
+    },
+    PlayerA: {
+      on: {GameOver: 'GameOver'},
+      ...PlayerAStates,
+    },
+    PlayerB: {
+      on: {GameOver: 'GameOver'},
+      ...PlayerBStates,
+    },
+    GameOver: {on: {ExitToLobby: 'Lobby'}},
+  },
+};
