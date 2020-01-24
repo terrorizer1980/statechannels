@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import React from 'react';
 
-import {OpenGame} from '../redux/open-games/state';
+import {OpenGame} from '../machines/open-games/state';
 
 import {Button} from 'reactstrap';
 import {ApplicationLayout} from './ApplicationLayout';

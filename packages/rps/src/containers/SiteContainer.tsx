@@ -3,8 +3,8 @@ import React from 'react';
 import ApplicationContainer from './ApplicationContainer';
 import HomePageContainer from './HomePageContainer';
 import {connect} from 'react-redux';
-import {SiteState} from '../redux/reducer';
-import {WalletError} from '../redux/wallet/actions';
+import {SiteState} from '../machines/reducer';
+import {WalletError} from '../machines/wallet/actions';
 import LoadingPage from '../components/LoadingPage';
 
 import LoginErrorPage from '../components/LoginErrorPage';

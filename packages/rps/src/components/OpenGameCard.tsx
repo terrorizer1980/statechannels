@@ -1,7 +1,7 @@
 import React from 'react';
 import {Commitment} from 'fmg-core';
 import {Button} from 'reactstrap';
-import {OpenGame} from '../redux/open-games/state';
+import {OpenGame} from '../machines/open-games/state';
 import {bigNumberify, formatUnits} from 'ethers/utils';
 import {Blockie} from 'rimble-ui';
 

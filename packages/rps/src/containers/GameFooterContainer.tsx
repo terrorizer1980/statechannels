@@ -1,8 +1,8 @@
 import {connect} from 'react-redux';
 
 import GameFooter from '../components/GameFooter';
-import * as gameActions from '../redux/game/actions';
-import {SiteState} from '../redux/reducer';
+import * as gameActions from '../machines/game/actions';
+import {SiteState} from '../machines/reducer';
 
 function mapStateToProps(state: SiteState) {
   const localState = state.game.localState;

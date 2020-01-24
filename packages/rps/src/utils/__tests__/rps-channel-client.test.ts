@@ -1,5 +1,5 @@
 import {RPSChannelClient} from '../rps-channel-client';
-import {aAddress, bAddress, aBal, bBal, appData} from '../../redux/game/__tests__/scenarios';
+import {aAddress, bAddress, aBal, bBal, appData} from '../../machines/game/__tests__/scenarios';
 import {
   ChannelClientInterface,
   ChannelResult,

@@ -1,10 +1,10 @@
 import React from 'react';
 import {connect} from 'react-redux';
 
-import {SiteState} from '../redux/reducer';
+import {SiteState} from '../machines/reducer';
 import GameContainer from './GameContainer';
 import LobbyContainer from './LobbyContainer';
-import * as gameStates from '../redux/game/state';
+import * as gameStates from '../machines/game/state';
 
 interface ApplicationProps {
   gameState: gameStates.GameState;

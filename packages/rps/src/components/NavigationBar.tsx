@@ -4,7 +4,7 @@ import {Button, Navbar} from 'reactstrap';
 import {Commitment} from 'fmg-core';
 import {RulesModal} from './RulesModal';
 import NetworkIndicator from '@rimble/network-indicator';
-import {MetamaskState} from 'src/redux/metamask/state';
+import {MetamaskState} from 'src/machines/metamask/state';
 
 interface Props {
   showRules: boolean;

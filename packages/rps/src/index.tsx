@@ -7,7 +7,7 @@ import {interpret} from 'xstate';
 // Not adding in currently because it breaks most of our existing components
 // import 'bootstrap/dist/css/bootstrap.min.css';
 import './index.scss';
-import store from './redux/store';
+import store from './machines/store';
 import SiteContainer from './containers/SiteContainer';
 
 // Interpret the machine, and add a listener for whenever a transition occurs.

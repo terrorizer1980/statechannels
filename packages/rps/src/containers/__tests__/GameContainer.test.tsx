@@ -3,8 +3,8 @@ import {mount} from 'enzyme';
 import GameContainer from '../GameContainer';
 import configureStore from 'redux-mock-store';
 import GameProposed from '../../components/GameProposedPage';
-import {SiteState} from '../../redux/reducer';
-import {localStatesA} from '../../redux/game/__tests__/scenarios';
+import {SiteState} from '../../machines/reducer';
+import {localStatesA} from '../../machines/game/__tests__/scenarios';
 
 const mockStore = configureStore();
 

@@ -17,7 +17,7 @@ import * as ls from './state';
 import {randomHex} from '../../utils/randomHex';
 import {bigNumberify} from 'ethers/utils';
 import {buffers} from 'redux-saga';
-import {service} from '../../';
+import {service} from '../..';
 
 function* put(action: any) {
   yield oldPut(action);

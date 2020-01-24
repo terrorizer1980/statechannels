@@ -1,9 +1,9 @@
 import {createMachine, StateNodeConfig} from 'xstate';
-import {GameAction} from 'src/redux/game/actions';
-import {GlobalAction} from 'src/redux/global/actions';
-import {AnyAction} from 'src/redux/login/actions';
-import {MetamaskAction} from 'src/redux/metamask/actions';
-import {MetamaskState} from 'src/redux/metamask/state';
+import {GameAction} from 'src/machines/game/actions';
+import {GlobalAction} from 'src/machines/global/actions';
+import {AnyAction} from 'src/machines/login/actions';
+import {MetamaskAction} from 'src/machines/metamask/actions';
+import {MetamaskState} from 'src/machines/metamask/state';
 
 type TContext = any;
 interface TState {

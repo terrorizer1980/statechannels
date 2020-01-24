@@ -1,10 +1,10 @@
 import {connect} from 'react-redux';
 
 import NavigationBar from '../components/NavigationBar';
-import * as loginActions from '../redux/login/actions';
-import * as globalActions from '../redux/global/actions';
+import * as loginActions from '../machines/login/actions';
+import * as globalActions from '../machines/global/actions';
 
-import {SiteState} from '../redux/reducer';
+import {SiteState} from '../machines/reducer';
 
 const mapStateToProps = (state: SiteState) => {
   const name = 'name' in state.game.localState ? state.game.localState.name : '';

@@ -1,14 +1,14 @@
 import React, {Fragment} from 'react';
 import {connect} from 'react-redux';
 
-import {SiteState} from '../redux/reducer';
+import {SiteState} from '../machines/reducer';
 import {Weapon, ChannelState, isClosed} from '../core';
-import * as gameActions from '../redux/game/actions';
+import * as gameActions from '../machines/game/actions';
 
 import WaitingRoomPage from '../components/WaitingRoomPage';
 import ProfileContainer from './ProfileContainer';
 
-import {LocalState} from '../redux/game/state';
+import {LocalState} from '../machines/game/state';
 
 import LobbyContainer from './LobbyContainer';
 import {

@@ -1,10 +1,10 @@
 import {connect} from 'react-redux';
 
 import LobbyPage from '../components/LobbyPage';
-import * as actions from '../redux/game/actions';
+import * as actions from '../machines/game/actions';
 
-import {SiteState} from '../redux/reducer';
-import {OpenGame} from '../redux/open-games/state';
+import {SiteState} from '../machines/reducer';
+import {OpenGame} from '../machines/open-games/state';
 
 const mapStateToProps = (state: SiteState) => ({
   openGames: state.openGames as OpenGame[],

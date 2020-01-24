@@ -2,7 +2,7 @@ import React from 'react';
 import {StyleSheet, css} from 'aphrodite';
 import {Button} from 'reactstrap';
 import ConnectionBanner from '@rimble/connection-banner';
-import {MetamaskState} from 'src/redux/metamask/state';
+import {MetamaskState} from 'src/machines/metamask/state';
 interface Props {
   metamaskState: MetamaskState;
   login: () => any;

@@ -1,8 +1,8 @@
 import {connect} from 'react-redux';
 
 import GameBar from '../components/GameBar';
-import {SiteState} from '../redux/reducer';
-import {isPlayerA, isPlayerB} from '../redux/game/state';
+import {SiteState} from '../machines/reducer';
+import {isPlayerA, isPlayerB} from '../machines/game/state';
 
 function mapStateToProps(state: SiteState) {
   const {localState, channelState} = state.game;
