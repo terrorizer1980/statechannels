@@ -16,15 +16,31 @@ import {messageQueuedListener} from './message-service/message-queued-listener';
 import {gameSaga} from './game/saga';
 import {autoPlayer, autoOpponent} from './auto-opponent';
 import {ChannelClient, FakeChannelClient} from '@statechannels/channel-client';
+import {interpret} from 'xstate';
+import {rps} from '../xstate/xstate';
+
+// Interpret the machine, and add a listener for whenever a transition occurs.
+const service = interpret(rps, {devTools: true}).onTransition(state => {
+  console.log(state.value);
+});
+service.start();
 
 const composeEnhancers = (window as any).__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
-const enhancers = composeEnhancers(applyMiddleware(sagaMiddleware));
+
+// See https://redux.js.org/advanced/middleware/
+const xstateSender = store => next => action => {
+  service.send(action);
+  const result = next(action);
+  return result;
+};
+
+const enhancers = composeEnhancers(applyMiddleware(sagaMiddleware, xstateSender));
 
 const store = createStore(reducer, enhancers);
 
 function* rootSaga() {
-  yield fork(metamaskSaga);
   yield fork(loginSaga);
+  yield fork(metamaskSaga);
 
   let client;
   if (process.env.AUTO_OPPONENT === 'A' || process.env.AUTO_OPPONENT === 'B') {
