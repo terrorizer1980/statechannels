@@ -80,7 +80,7 @@ describe('when opponent joins your game', () => {
   describe('and the channel update arrives first', () => {
     it('calls joinChannel and transitions to OpponentJoined', async () => {
       const initialState = gameState(localStatesB.waitingRoom);
-      const appNotification = gameJoined(aName, aAddress);
+      const appNotification = gameJoined(aName, aAddress, aAddress);
       const channelUpdate = updateChannelState(channelStates.preFund0);
 
       const {storeState} = await expectSaga(gameSaga as any, client)
@@ -96,7 +96,7 @@ describe('when opponent joins your game', () => {
   describe('and the app notification update arrives first', () => {
     it('calls joinChannel and transitions to OpponentJoined', async () => {
       const initialState = gameState(localStatesB.waitingRoom);
-      const appNotification = gameJoined(aName, aAddress);
+      const appNotification = gameJoined(aName, aAddress, aAddress);
       const channelUpdate = updateChannelState(channelStates.preFund0);
 
       const {storeState} = await expectSaga(gameSaga as any, client)
@@ -283,8 +283,6 @@ describe('when in Resigned and user clicks on button', () => {
       .dispatch(action)
       .run({silenceTimeout: true});
 
-    expect(storeState).toEqual(
-      gameState(localStatesB.gameOver, channelStates.concludeFromAccepted)
-    );
+    expect(storeState).toEqual(gameState(localStatesB.gameOver, null));
   });
 });

@@ -1,11 +1,19 @@
-import { AnyEventObject, assign, AssignAction, Interpreter, Machine, spawn } from 'xstate';
-import { CreateChannel, JoinChannel } from '..';
-import { getChannelId, pretty, Store, unreachable } from '../..';
-import { ChannelUpdated } from '../../store';
+import { assign, AssignAction, Interpreter, Machine, spawn, MachineConfig } from 'xstate';
+
+import { getChannelId, unreachable } from '../..';
+import { ChannelUpdated, IStore } from '../../store';
 import { FundingStrategyProposed, OpenChannel, SendStates } from '../../wire-protocol';
 
+import { CreateChannel, JoinChannel, ConcludeChannel } from '..';
+
 const PROTOCOL = 'wallet';
-export type Events = OpenChannelEvent | CreateChannelEvent | SendStates | FundingStrategyProposed;
+export type Events =
+  | OpenChannelEvent
+  | CreateChannelEvent
+  | ConcludeChannelEvent
+  | SendStates
+  | FundingStrategyProposed;
+
 export type Process = {
   id: string;
   ref: Interpreter<any, any, any>;
@@ -24,21 +32,24 @@ function forwardToChildren(_ctx, event: Events, { state }) {
     case 'CREATE_CHANNEL':
     case 'OPEN_CHANNEL':
     case 'SendStates':
+    case 'CONCLUDE_CHANNEL':
       break;
     default:
       unreachable(event);
   }
 }
-const config = {
+const config: MachineConfig<Init, any, Events> = {
   key: PROTOCOL,
   initial: 'running',
   context: { processes: [], id: 'unknown' },
   states: {
     running: {
       on: {
-        OPEN_CHANNEL: { actions: 'spawnJoinChannel' },
         CREATE_CHANNEL: { actions: 'spawnCreateChannel' },
-        '*': { actions: ['updateStore', forwardToChildren] },
+        CONCLUDE_CHANNEL: { actions: 'spawnConcludeChannel' },
+        OPEN_CHANNEL: { actions: 'spawnJoinChannel' },
+        SendStates: { actions: ['updateStore', forwardToChildren] },
+        FUNDING_STRATEGY_PROPOSED: { actions: forwardToChildren },
       },
     },
   },
@@ -50,37 +61,20 @@ export type CreateChannelEvent = CreateChannel.Init & {
   type: 'CREATE_CHANNEL';
 };
 
+export type ConcludeChannelEvent = ConcludeChannel.Init & {
+  type: 'CONCLUDE_CHANNEL';
+};
+
 export { config };
 export type Actions = {
   spawnJoinChannel: AssignAction<Init, OpenChannelEvent>;
   spawnCreateChannel: AssignAction<Init, CreateChannelEvent>;
+  spawnConcludeChannel: AssignAction<Init, ConcludeChannelEvent>;
   forwardToChildren: typeof forwardToChildren;
   updateStore: any; // TODO
 };
 
-function addLogs(walletProcess: Process, ctx): Process {
-  walletProcess.ref
-    .onTransition(state =>
-      console.log(
-        pretty({
-          actor: `${ctx.id}.${walletProcess.id}`,
-          TRANSITION: { state: state.value },
-        })
-      )
-    )
-    .onEvent(event => {
-      console.log(
-        pretty({
-          actor: `${ctx.id}.${walletProcess.id}`,
-          EVENT: { event: event.type },
-        })
-      );
-    });
-
-  return walletProcess;
-}
-
-export function machine(store: Store, context: Init) {
+export function machine(store: IStore, context: Init) {
   const spawnCreateChannel = assign(
     (ctx: Init, { type, ...init }: CreateChannelEvent): Init => {
       const processId = `create-channel`;
@@ -88,13 +82,13 @@ export function machine(store: Store, context: Init) {
         throw new Error('Process exists');
       }
 
-      const walletProcess = {
+      const walletProcess: Process = {
         id: processId,
-        ref: spawn(CreateChannel.machine(store, init).withContext(init), processId),
+        ref: spawn<CreateChannel.Init, any>(
+          CreateChannel.machine(store, init).withContext(init),
+          processId
+        ),
       };
-      if (process.env.ADD_LOGS) {
-        addLogs(walletProcess, ctx);
-      }
 
       return {
         ...ctx,
@@ -109,15 +103,29 @@ export function machine(store: Store, context: Init) {
     if (ctx.processes.find(p => p.id === processId)) {
       throw new Error('Process exists');
     }
-    const joinChannelMachine = JoinChannel.machine(store, { channelId });
+
+    const joinChannelMachine = JoinChannel.machine(store, event);
     const walletProcess: Process = {
       id: processId,
       ref: spawn(joinChannelMachine, processId),
     };
-    if (process.env.ADD_LOGS) {
-      addLogs(walletProcess, ctx);
+    return {
+      ...ctx,
+      processes: ctx.processes.concat([walletProcess]),
+    };
+  });
+
+  const spawnConcludeChannel = assign((ctx: Init, { channelId }: ConcludeChannelEvent) => {
+    const processId = `conclude-${channelId}`;
+    if (ctx.processes.find(p => p.id === processId)) {
+      throw new Error('Process exists');
     }
-    walletProcess.ref.send(event);
+
+    const concludeChannelMachine = ConcludeChannel.machine(store, { channelId });
+    const walletProcess: Process = {
+      id: processId,
+      ref: spawn(concludeChannelMachine, processId),
+    };
     return {
       ...ctx,
       processes: ctx.processes.concat([walletProcess]),
@@ -125,41 +133,25 @@ export function machine(store: Store, context: Init) {
   });
 
   // TODO: Should this send `CHANNEL_UPDATED` to children?
-  const updateStore = (_ctx, event: Events, { state }) => {
-    let channelId = '';
-    switch (event.type) {
-      case 'OPEN_CHANNEL':
-        store.receiveStates([event.signedState]);
-        channelId = getChannelId(event.signedState.state.channel);
-        break;
-      case 'SendStates':
-        store.receiveStates(event.signedStates);
-        channelId = getChannelId(event.signedStates[0].state.channel);
-        break;
-      case 'CREATE_CHANNEL':
-      case 'FUNDING_STRATEGY_PROPOSED':
-        break;
-      default:
-        unreachable(event);
-    }
-
-    if (channelId) {
-      const channelUpdated: ChannelUpdated = {
-        type: 'CHANNEL_UPDATED',
-        channelId,
-      };
-      state.context.processes.forEach(({ ref }: Process) => ref.send(channelUpdated));
-    }
+  const updateStore = (_ctx, event: SendStates, { state }) => {
+    store.receiveStates(event.signedStates);
+    const channelId = getChannelId(event.signedStates[0].state.channel);
+    const channelUpdated: ChannelUpdated = {
+      type: 'CHANNEL_UPDATED',
+      channelId,
+    };
+    state.context.processes.forEach(({ ref }: Process) => ref.send(channelUpdated));
   };
 
   const options: { actions: Actions } = {
     actions: {
       spawnCreateChannel,
       spawnJoinChannel,
+      spawnConcludeChannel,
       forwardToChildren,
       updateStore,
     },
   };
 
-  return Machine(config, options).withContext(context);
+  return Machine(config).withConfig(options, context);
 }

@@ -98,6 +98,7 @@ commands:
 jobs:
   prepare:
     <<: *defaults
+    resource_class: large
     steps:
       - checkout
       - log_stats:
@@ -128,11 +129,20 @@ jobs:
       - attach_workspace:
           at: /home/circleci/project
       - run: yarn lint:check
-      - run: yarn build:ci
+      - run:
+          name: build
+          command: |
+            if [ "${CIRCLE_BRANCH}" = "master" ]
+            then
+                yarn build:ci
+            else
+                yarn build:ci:incremental
+            fi
       - notify_slack
 
   test:
     <<: *defaults
+    resource_class: large
     steps:
       - checkout
       - log_stats:
@@ -140,7 +150,14 @@ jobs:
       - attach_workspace:
           at: /home/circleci/project
       - run:
-          command: yarn test:ci
+          name: test
+          command: |
+            if [ "${CIRCLE_BRANCH}" = "master" ]
+            then
+              yarn test:ci
+            else
+              yarn test:ci:incremental
+            fi
           no_output_timeout: 30m
       - upload_logs:
           file: test-stats
@@ -156,13 +173,12 @@ jobs:
     docker:
       - image: circleci/node:10.16.3
     environment:
-      USE_VIRTUAL_FUNDING: FALSE
+      USE_VIRTUAL_FUNDING: 'FALSE'
       USE_GANACHE_DEPLOYMENT_CACHE: true
       GANACHE_CACHE_FOLDER: ../../.ganache-deployments
       GANACHE_PORT: 8547
     steps:
-      - checkout:
-          path: /home/circleci/project
+      - checkout
       - puppeteer/install
       - log_stats:
           file: integration-test-stats
@@ -172,19 +188,87 @@ jobs:
           command: (cd packages/devtools && yarn run start:shared-ganache)
           background: true
       - run:
-          command: (cd packages/wallet && yarn run wait-on ${GANACHE_CACHE_FOLDER} && yarn run start:integration)
+          command: (cd packages/wallet && yarn run wait-on ../../.ganache-deployments && yarn run start:integration)
           background: true
       - run:
-          command: (cd packages/rps && yarn run wait-on ${GANACHE_CACHE_FOLDER} && yarn run start)
+          command: (cd packages/rps && yarn run wait-on ../../.ganache-deployments && yarn run start)
           background: true
-      # - run:
-      #     command: (cd packages/hub && yarn run wait-on ${GANACHE_CACHE_FOLDER} && yarn run hub:start:dev)
-      #     background: true
       - run: (cd packages/wallet && yarn run test:ci:integration)
       - run: (cd packages/e2e-tests && yarn test)
       - upload_logs:
           file: integration-test-stats
       - notify_slack
+
+  integration-test-with-hub:
+    resource_class: medium
+    working_directory: /home/circleci/project
+    docker:
+      - image: circleci/node:10.16.3
+      - image: circleci/postgres:12.0-alpine
+        environment:
+          POSTGRES_USER: root
+          # Note that the DB is hub_wallet_${NODE_ENV} and we use development for this job
+          POSTGRES_DB: hub_wallet_development
+          POSTGRES_PASSWORD: ''
+          NODE_ENV: test
+    environment:
+      USE_VIRTUAL_FUNDING: 'TRUE'
+      HUB_DB_NAME: hub_wallet_development
+      # The development environment mimics integration environment
+      NODE_ENV: development
+      # NOTE: This MUST be unique for the CircleCI environment, otherwise messages might overlap on Firebase.
+      HUB_ADDRESS: '0x24170308A71bc41d0dE9B7CEF74c0EeCc8033521'
+      HUB_PRIVATE_KEY: '0x8bf18c8953c7b41aac4cc3351dc179cda6831fcca852cbf71e4b0a75daf464ae'
+
+    steps:
+      - checkout
+      - puppeteer/install
+      - log_stats:
+          file: integration-test-stats
+      - attach_workspace:
+          at: /home/circleci/project
+      - run: |
+          sudo apt-get install postgresql-client
+          (cd packages/hub && yarn db:migrate && yarn db:seed)
+          cd /home/circleci/project
+      - run:
+          command: (cd packages/devtools && yarn run start:shared-ganache)
+          background: true
+      - run:
+          command: (cd packages/wallet && yarn run wait-on ../../.ganache-deployments && yarn run start:integration)
+          background: true
+      - run:
+          command: (cd packages/rps && yarn run wait-on ../../.ganache-deployments && yarn run start)
+          background: true
+      - run:
+          command: (cd packages/hub && yarn run wait-on ../../.ganache-deployments && yarn run hub:start:dev)
+          background: true
+      - run: (cd packages/e2e-tests && yarn test)
+      - upload_logs:
+          file: integration-test-stats
+      - notify_slack
+
+  release-incremental:
+    <<: *defaults
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /home/circleci/project
+      - run: yarn build:netlify:incremental
+      - run: yarn release:netlify:incremental
+
+  release:
+    <<: *defaults
+    steps:
+      - checkout
+      - log_stats:
+          file: netlify-stats
+      - attach_workspace:
+          at: /home/circleci/project
+      - run: yarn build:netlify
+      - run: yarn release:netlify
+      - upload_logs:
+          file: netlify-stats
 
 workflows:
   statechannels:
@@ -202,3 +286,21 @@ workflows:
       - integration-test:
           requires:
             - prepare
+
+      - integration-test-with-hub:
+          requires:
+            - prepare
+
+      - release-incremental:
+          requires:
+            - prepare
+          filters:
+            branches:
+              ignore: master
+
+      - release:
+          requires:
+            - prepare
+          filters:
+            branches:
+              only: master

@@ -1,6 +1,11 @@
-import { assign, DoneInvokeEvent, Machine } from 'xstate';
+import { assign, DoneInvokeEvent, Machine, MachineConfig } from 'xstate';
+
+import { allocateToTarget } from '../../calculations';
+import { Channel, MachineFactory, IStore, success, getEthAllocation, FINAL } from '../..';
+import { getDetaAndInvoke } from '../../machine-utils';
+import { Funding } from '../../ChannelStoreEntry';
+
 import { CreateNullChannel, DirectFunding, SupportState } from '..';
-import { Allocation, Channel, ensureExists, MachineFactory, Store, success } from '../..';
 
 const PROTOCOL = 'ledger-funding';
 
@@ -46,10 +51,7 @@ const determineLedgerChannel = {
 const createNewLedger = {
   invoke: {
     src: 'createNullChannel',
-    data: (_, { data }: DoneInvokeEvent<CreateNullChannel.Init>) => ({
-      channel: data.channel,
-      outcome: data.outcome,
-    }),
+    data: (_, { data }: DoneInvokeEvent<CreateNullChannel.Init>) => data,
     onDone: { target: 'success', actions: assignLedgerChannelId },
     autoForward: true,
   },
@@ -67,76 +69,57 @@ const waitForChannel = {
 };
 
 type LedgerExists = Init & { ledgerChannelId: string };
-const fundLedger = {
+const fundLedger = getDetaAndInvoke('getTargetAllocation', 'directFunding', 'fundTarget');
+const fundTarget = getDetaAndInvoke('getTargetOutcome', 'supportState', 'updateFunding');
+const updateFunding = {
   invoke: {
-    src: 'directFunding',
-    onDone: 'fundTarget',
-    autoForward: true,
+    src: 'updateFunding',
+    onDone: 'success',
   },
 };
 
-const fundTarget = {
-  initial: 'getTargetOutcome',
-  states: {
-    getTargetOutcome: {
-      invoke: {
-        src: 'getTargetOutcome',
-        onDone: 'ledgerUpdate',
-      },
-    },
-    ledgerUpdate: {
-      invoke: {
-        src: 'supportState',
-        data: (ctx: LedgerExists, { data }: DoneInvokeEvent<{ outcome: Allocation }>) => ({
-          channelId: ctx.ledgerChannelId,
-          outcome: data.outcome,
-        }),
-        autoForward: true,
-        onDone: 'success',
-      },
-    },
-    success,
-  },
-  onDone: 'success',
-};
-
-export const config = {
+export const config: MachineConfig<any, any, any> = {
   key: PROTOCOL,
   initial: 'waitForChannel',
   states: {
     waitForChannel,
     fundLedger,
     fundTarget,
+    updateFunding,
     success,
   },
 };
 
+type LedgerLookup = { type: 'FOUND'; channelId: string } | { type: 'NOT_FOUND' };
 export type Services = {
-  findLedgerChannelId(
-    ctx: Init
-  ): Promise<{ type: 'FOUND'; channelId: string } | { type: 'NOT_FOUND' }>;
+  findLedgerChannelId(ctx: Init): Promise<LedgerLookup>;
   getNullChannelArgs(ctx: Init): Promise<CreateNullChannel.Init>;
   createNullChannel: any;
+  getTargetAllocation(ctx: LedgerExists): Promise<DirectFunding.Init>;
   directFunding: any;
   getTargetOutcome(ctx: LedgerExists): Promise<SupportState.Init>;
-  supportState: any;
+  updateFunding(ctx: LedgerExists): Promise<void>;
+  supportState: ReturnType<SupportState.machine>;
 };
 
 export const guards = {
-  channelFound: (_, { data }: DoneInvokeEvent<{ type: 'FOUND' | 'NOT_FOUND' }>) =>
-    data.type === 'FOUND',
+  channelFound: (_, { data }: DoneInvokeEvent<LedgerLookup>) => data.type === 'FOUND',
 };
 
-export const machine: MachineFactory<Init, any> = (store: Store, context: Init) => {
-  function directFundingArgs(ctx: LedgerExists): DirectFunding.Init {
+export const machine: MachineFactory<Init, any> = (store: IStore, context: Init) => {
+  async function getTargetAllocation(ctx: LedgerExists): Promise<DirectFunding.Init> {
+    const minimalAllocation = getEthAllocation(
+      store.getEntry(ctx.targetChannelId).latestState.outcome
+    );
+
     return {
       channelId: ctx.ledgerChannelId,
-      minimalOutcome: store.getLatestState(ctx.targetChannelId).outcome,
+      minimalAllocation,
     };
   }
 
   async function getNullChannelArgs({ targetChannelId }: Init): Promise<CreateNullChannel.Init> {
-    const { channel: targetChannel, latestSupportedState } = store.getEntry(targetChannelId);
+    const { channel: targetChannel } = store.getEntry(targetChannelId);
 
     const channel: Channel = {
       ...targetChannel,
@@ -144,39 +127,42 @@ export const machine: MachineFactory<Init, any> = (store: Store, context: Init) 
     };
 
     // TODO: check that the latest supported state is the last prefund setup state?
-    const { outcome } = ensureExists(latestSupportedState);
 
-    return {
-      channel,
-      outcome,
-    };
+    return { channel };
   }
 
   async function getTargetOutcome({
     targetChannelId,
     ledgerChannelId,
   }: LedgerExists): Promise<SupportState.Init> {
-    // const { latestState: ledgerState } = store.getEntry(ledgerChannelId);
-    // const { latestState: targetChannelState } = store.getEntry(targetChannelId);
+    const { latestState: ledgerState } = store.getEntry(ledgerChannelId);
+    const { latestState: targetChannelState } = store.getEntry(targetChannelId);
 
-    const outcome: Allocation = [
-      {
-        destination: targetChannelId,
-        amount: 'TODO', // TODO
-      },
-    ];
+    const ledgerAllocation = getEthAllocation(ledgerState.outcome);
+    const targetAllocation = getEthAllocation(targetChannelState.outcome);
+
     return {
-      channelId: ledgerChannelId,
-      outcome,
+      state: {
+        ...ledgerState,
+        turnNum: ledgerState.turnNum + 1,
+        outcome: allocateToTarget(targetAllocation, ledgerAllocation, targetChannelId),
+      },
     };
+  }
+
+  async function updateFunding({ targetChannelId, ledgerChannelId }: LedgerExists) {
+    const funding: Funding = { type: 'Indirect', ledgerId: ledgerChannelId };
+    await store.setFunding(targetChannelId, funding);
   }
 
   const services: Services = {
     findLedgerChannelId: async () => ({ type: 'NOT_FOUND' }), // TODO
     getNullChannelArgs,
     createNullChannel: CreateNullChannel.machine(store),
-    directFunding: async () => true,
+    getTargetAllocation,
+    directFunding: DirectFunding.machine(store),
     getTargetOutcome,
+    updateFunding,
     supportState: SupportState.machine(store),
   };
 

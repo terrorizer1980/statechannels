@@ -16,64 +16,52 @@ const jestViolations = {
   'jest/no-standalone-expect': 'off'
 };
 
-const emberRules = {
-  'ember/no-jquery': 'error'
+const importRules = {
+  // Could not get this rule to work properly
+  'import/no-unresolved': 'off',
+  'import/no-duplicates': 'off',
+  // NOTE: There is some error with eslint-plugin-import treating redux-saga/effects wrongly
+  // https://github.com/benmosher/eslint-plugin-import/issues/793#issuecomment-314088164
+  'import/named': 'off'
 };
 
 module.exports = {
-  parser: 'babel-eslint',
-  parserOptions: {
-    ecmaVersion: 2018,
-    sourceType: 'module',
-    ecmaFeatures: {
-      legacyDecorators: true
-    }
-  },
+  parser: '@typescript-eslint/parser',
   env: {
     browser: true,
     es6: true
   },
-  plugins: ['jest', 'ember'],
+  plugins: ['@typescript-eslint', 'jest', 'prettier'],
   extends: [
     'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
     'plugin:jest/recommended',
     'plugin:jest/style',
-    'plugin:ember/recommended',
     'plugin:prettier/recommended'
   ],
   rules: {
     ...generalRules,
-    ...jestViolations,
-    ...emberRules
+    ...importRules,
+    ...jestViolations
   },
   overrides: [
-    // node files
     {
-      files: [
-        '.eslintrc.js',
-        '.template-lintrc.js',
-        'ember-cli-build.js',
-        'testem.js',
-        'blueprints/*/index.js',
-        'config/**/*.js',
-        'lib/*/index.js',
-        'server/**/*.js'
-      ],
+      files: ['**/*.js'],
+      parser: 'babel-eslint',
       parserOptions: {
-        sourceType: 'script'
+        ecmaVersion: 2018,
+        sourceType: 'module',
+        ecmaFeatures: {
+          legacyDecorators: true
+        }
+      },
+      rules: {
+        '@typescript-eslint/no-var-requires': 'off',
+        '@typescript-eslint/explicit-function-return-type': 'off'
       },
       env: {
-        browser: false,
         node: true
-      },
-      plugins: ['node'],
-      rules: Object.assign({}, require('eslint-plugin-node').configs.recommended.rules, {
-        // add your custom rules and overrides for node files here
-
-        // this can be removed once the following is fixed
-        // https://github.com/mysticatea/eslint-plugin-node/issues/77
-        'node/no-unpublished-require': 'off'
-      })
+      }
     }
   ]
 };

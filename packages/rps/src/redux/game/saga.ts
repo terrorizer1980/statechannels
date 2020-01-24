@@ -64,7 +64,10 @@ function* gameSagaRun(client: RPSChannelClient) {
   switch (localState.type) {
     case 'Setup.NeedAddress':
       const address: string = yield call([client, 'getAddress']);
-      yield put(a.gotAddressFromWallet(address));
+      const outcomeAddress: string = window.ethereum.selectedAddress;
+      if (outcomeAddress) {
+        yield put(a.gotAddressFromWallet(address, outcomeAddress));
+      }
       break;
     case 'A.GameChosen':
       if (cs.isEmpty(channelState)) {
@@ -131,6 +134,11 @@ function* gameSagaRun(client: RPSChannelClient) {
         yield* closeChannel(channelState, client);
       }
       break;
+    case 'EndGame.GameOver':
+      if (channelState) {
+        yield put(a.updateChannelState(null));
+      }
+      break;
   }
 }
 
@@ -145,7 +153,9 @@ function* createChannel(localState: ls.A.GameChosen, client: RPSChannelClient) {
     localState.opponentAddress,
     openingBalance.toString(),
     openingBalance.toString(),
-    startState
+    startState,
+    localState.outcomeAddress,
+    localState.opponentOutcomeAddress
   );
   yield put(a.updateChannelState(newChannelState));
 }
@@ -169,7 +179,15 @@ function* generateSaltAndSendPropose(
   yield put(a.chooseSalt(salt)); // transitions us to WeaponAndSaltChosen
 
   const {myWeapon, roundBuyIn: stake} = localState;
-  const {channelId, aBal, bBal, aAddress, bAddress} = channelState;
+  const {
+    channelId,
+    aBal,
+    bBal,
+    aAddress,
+    bAddress,
+    aOutcomeAddress,
+    bOutcomeAddress,
+  } = channelState;
 
   const preCommit = hashPreCommit(myWeapon, salt);
 
@@ -182,7 +200,9 @@ function* generateSaltAndSendPropose(
     bAddress,
     aBal,
     bBal,
-    roundProposed
+    roundProposed,
+    aOutcomeAddress,
+    bOutcomeAddress
   );
   yield put(a.updateChannelState(updatedChannelState));
 }
@@ -193,7 +213,15 @@ function* sendRoundAccepted(
   client: RPSChannelClient
 ) {
   const playerBWeapon = localState.myWeapon;
-  const {channelId, aBal, bBal, aAddress, bAddress} = channelState;
+  const {
+    channelId,
+    aBal,
+    bBal,
+    aAddress,
+    bAddress,
+    aOutcomeAddress,
+    bOutcomeAddress,
+  } = channelState;
   const {stake, preCommit} = channelState.appData;
   const roundAccepted: AppData = {
     type: 'roundAccepted',
@@ -218,7 +246,9 @@ function* sendRoundAccepted(
     bAddress,
     aBal2,
     bBal2,
-    roundAccepted
+    roundAccepted,
+    aOutcomeAddress,
+    bOutcomeAddress
   );
   yield put(a.updateChannelState(newState));
 }
@@ -229,7 +259,15 @@ function* calculateResultAndSendReveal(
   client: RPSChannelClient
 ) {
   const {myWeapon, salt} = localState;
-  const {aBal, bBal, channelId, aAddress, bAddress} = channelState;
+  const {
+    aBal,
+    bBal,
+    channelId,
+    aAddress,
+    bAddress,
+    aOutcomeAddress,
+    bOutcomeAddress,
+  } = channelState;
   const {playerBWeapon: theirWeapon, stake} = channelState.appData;
   const result = calculateResult(myWeapon, theirWeapon);
   const [aBal2, bBal2] = updateAllocation(result, Player.PlayerA, stake, aBal, bBal);
@@ -249,7 +287,9 @@ function* calculateResultAndSendReveal(
     bAddress,
     aBal2.toString(),
     bBal2.toString(),
-    reveal
+    reveal,
+    aOutcomeAddress,
+    bOutcomeAddress
   );
   yield put(a.updateChannelState(updatedChannelState));
   yield put(a.resultArrived(theirWeapon, result, fundingSituation));
@@ -273,7 +313,15 @@ function* calculateResultAndCloseChannelIfNoFunds(
 }
 
 function* sendStartAndStartRound(channelState: ChannelState<Reveal>, client: RPSChannelClient) {
-  const {aBal, bBal, channelId, bAddress, aAddress} = channelState;
+  const {
+    aBal,
+    bBal,
+    channelId,
+    bAddress,
+    aAddress,
+    aOutcomeAddress,
+    bOutcomeAddress,
+  } = channelState;
   const start: AppData = {type: 'start'};
   const state = yield call(
     [client, 'updateChannel'],
@@ -282,7 +330,9 @@ function* sendStartAndStartRound(channelState: ChannelState<Reveal>, client: RPS
     bAddress,
     aBal,
     bBal,
-    start
+    start,
+    aOutcomeAddress,
+    bOutcomeAddress
   );
   yield put(a.updateChannelState(state));
   yield put(a.startRound());

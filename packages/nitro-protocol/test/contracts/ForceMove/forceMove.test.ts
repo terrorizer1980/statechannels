@@ -14,7 +14,7 @@ import {
   TURN_NUM_RECORD_NOT_INCREASED,
 } from '../../../src/contract/transaction-creators/revert-reasons';
 import {SignedState} from '../../../src/index';
-import {signChallengeMessage} from '../../../src/signatures';
+import {signChallengeMessage, signState} from '../../../src/signatures';
 import {COUNTING_APP_INVALID_TRANSITION} from '../../revert-reasons';
 import {
   clearedChallengeHash,
@@ -24,7 +24,10 @@ import {
   ongoingChallengeHash,
   setupContracts,
   signStates,
+  writeGasConsumption,
 } from '../../test-helpers';
+import {createForceMoveTransaction} from '../../../src/transactions';
+import {TransactionRequest} from 'ethers/providers';
 
 const provider = getTestProvider();
 
@@ -36,7 +39,7 @@ const wallets = new Array(3);
 const challengeDuration = 0x1;
 const outcome = [{allocation: [], assetHolderAddress: Wallet.createRandom().address}];
 
-let appDefinition;
+const appDefinition = getPlaceHolderContractAddress();
 
 // Populate wallets and participants array
 for (let i = 0; i < 3; i++) {
@@ -44,13 +47,32 @@ for (let i = 0; i < 3; i++) {
   participants[i] = wallets[i].address;
 }
 
+const twoPartyChannel: Channel = {
+  chainId: '0x1',
+  channelNonce: '0x1',
+  participants: [wallets[0].address, wallets[1].address],
+};
+
+async function createSignedCountingAppState(channel: Channel, appData: number, turnNum: number) {
+  return await signState(
+    {
+      turnNum,
+      isFinal: false,
+      appDefinition: getPlaceHolderContractAddress(),
+      appData: defaultAbiCoder.encode(['uint256'], [appData]),
+      outcome: [],
+      channel,
+      challengeDuration: 0xfff,
+    },
+    wallets[turnNum % channel.participants.length].privateKey
+  );
+}
 beforeAll(async () => {
   ForceMove = await setupContracts(
     provider,
     ForceMoveArtifact,
     process.env.TEST_FORCE_MOVE_ADDRESS
   );
-  appDefinition = getPlaceHolderContractAddress();
 });
 
 // Scenarios are synonymous with channelNonce:
@@ -112,7 +134,13 @@ describe('forceMove', () => {
   `(
     '$description', // For the purposes of this test, chainId and participants are fixed, making channelId 1-1 with channelNonce
 
-    async ({initialChannelStorageHash, stateData, challengeSignature, reasonString}) => {
+    async ({
+      description,
+      initialChannelStorageHash,
+      stateData,
+      challengeSignature,
+      reasonString,
+    }) => {
       const {appDatas, whoSignedWhat} = stateData;
       const channel: Channel = {
         chainId,
@@ -158,6 +186,7 @@ describe('forceMove', () => {
         await expectRevert(() => tx, reasonString);
       } else {
         const receipt = await (await tx).wait();
+        await writeGasConsumption('./forceMove.gas.md', description, receipt.gasUsed);
         const event = receipt.events.pop();
 
         // Catch ForceMove event
@@ -202,4 +231,33 @@ describe('forceMove', () => {
       }
     }
   );
+});
+
+describe('forceMove with transaction generator', () => {
+  beforeEach(async () => {
+    await (await ForceMove.setChannelStorageHash(getChannelId(twoPartyChannel), HashZero)).wait();
+  });
+  afterEach(async () => {
+    await (await ForceMove.setChannelStorageHash(getChannelId(twoPartyChannel), HashZero)).wait();
+  });
+  it.each`
+    description                  | appData   | turnNums  | challenger
+    ${'forceMove(0,1) accepted'} | ${[0, 0]} | ${[0, 1]} | ${1}
+    ${'forceMove(1,2) accepted'} | ${[0, 0]} | ${[1, 2]} | ${0}
+  `('$description', async ({description, appData, turnNums, challenger}) => {
+    const transactionRequest: TransactionRequest = createForceMoveTransaction(
+      [
+        await createSignedCountingAppState(twoPartyChannel, appData[0], turnNums[0]),
+        await createSignedCountingAppState(twoPartyChannel, appData[1], turnNums[1]),
+      ],
+      wallets[challenger].privateKey
+    );
+    const signer = provider.getSigner();
+    const transaction = {data: transactionRequest.data, gasLimit: 3000000};
+    const response = await signer.sendTransaction({
+      to: ForceMove.address,
+      ...transaction,
+    });
+    expect(response).toBeDefined();
+  });
 });

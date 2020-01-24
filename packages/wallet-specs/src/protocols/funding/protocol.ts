@@ -1,7 +1,10 @@
 import { assign, DoneInvokeEvent, Machine } from 'xstate';
-import { LedgerFunding } from '..';
-import { failure, MachineFactory, pretty, Store, success } from '../..';
+
+import { failure, MachineFactory, pretty, IStore, success } from '../..';
 import { FundingStrategy, FundingStrategyProposed } from '../../wire-protocol';
+import { log } from '../../utils';
+
+import { LedgerFunding } from '..';
 
 const PROTOCOL = 'funding';
 
@@ -35,8 +38,14 @@ const getClientChoice = {
 
 const wait = {
   on: {
-    '': [{ target: 'success', cond: 'consensus' }, { target: 'retry', cond: 'disagreement' }],
-    '*': [{ target: 'success', cond: 'consensus' }, { target: 'retry', cond: 'disagreement' }],
+    '': [
+      { target: 'success', cond: 'consensus' },
+      { target: 'retry', cond: 'disagreement' },
+    ],
+    '*': [
+      { target: 'success', cond: 'consensus' },
+      { target: 'retry', cond: 'disagreement' },
+    ],
   },
 };
 
@@ -167,7 +176,7 @@ const mockServices: Services = {
 };
 const mockActions: Actions = {
   sendClientChoice: (ctx: ClientChoiceKnown) => {
-    console.log(`Sending ${pretty(strategyChoice(ctx))}`);
+    log(`Sending ${pretty(strategyChoice(ctx))}`);
   },
   assignClientChoice,
 };
@@ -178,7 +187,7 @@ export const mockOptions: Options = {
   actions: mockActions,
 };
 
-export const machine: MachineFactory<Init, any> = (store: Store, context: Init) => {
+export const machine: MachineFactory<Init, any> = (store: IStore, context: Init) => {
   function sendClientChoice(ctx: ClientChoiceKnown) {
     store.sendStrategyChoice(strategyChoice(ctx));
   }

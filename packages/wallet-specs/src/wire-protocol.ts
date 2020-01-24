@@ -1,3 +1,5 @@
+import { Participant } from './store';
+
 import { SignedState } from '.';
 
 export type HubChoice = {
@@ -17,6 +19,7 @@ export type FundingStrategyProposed = {
 
 export type OpenChannel = {
   type: 'OPEN_CHANNEL';
+  participants: Participant[];
   signedState: SignedState;
 };
 

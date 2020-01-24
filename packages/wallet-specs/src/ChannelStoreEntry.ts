@@ -1,5 +1,12 @@
-import { Channel, getChannelId, SignedState, State } from '.';
-import { Participant } from './store';
+import { Channel, getChannelId, State } from '@statechannels/nitro-protocol';
+import { ethers } from 'ethers';
+import _ from 'lodash';
+import { getStateSignerAddress } from '@statechannels/nitro-protocol/lib/src/signatures';
+
+import { Participant, Store } from './store';
+import { store } from './temp-store';
+
+import { SignedState } from '.';
 
 interface DirectFunding {
   type: 'Direct';
@@ -36,24 +43,31 @@ export function isGuarantee(funding: Funding): funding is Guaranteed {
 }
 
 export interface IChannelStoreEntry {
-  supportedState: SignedState[];
-  unsupportedStates: SignedState[];
+  states: SignedState[];
   privateKey: string;
   participants: Participant[];
   channel: Channel;
   funding?: Funding;
 }
 
+export function supported(signedState: SignedState) {
+  // TODO: temporarily just check the required length
+  return (
+    signedState.signatures.filter(Boolean).length === signedState.state.channel.participants.length
+  );
+}
+
 export class ChannelStoreEntry implements IChannelStoreEntry {
-  public supportedState: SignedState[];
-  public unsupportedStates: SignedState[];
-  public privateKey: string;
-  public participants: Participant[];
-  public funding?: Funding;
-  public channel: Channel;
+  public readonly states: SignedState[] = [];
+  public readonly privateKey: string;
+  public readonly participants: Participant[];
+  public readonly funding?: Funding;
+  public readonly channel: Channel;
 
   constructor(args: Partial<IChannelStoreEntry>) {
-    const { privateKey, participants, channel } = args;
+    args = _.cloneDeep(args);
+
+    const { privateKey, participants, channel, states, funding } = args;
     if (privateKey && participants && channel) {
       this.privateKey = privateKey;
       this.participants = participants;
@@ -61,41 +75,52 @@ export class ChannelStoreEntry implements IChannelStoreEntry {
     } else {
       throw new Error('Required arguments missing');
     }
-    this.supportedState = args.supportedState || [];
-    this.unsupportedStates = args.unsupportedStates || [];
-    this.funding = args.funding;
+    this.states = states || [];
+    this.funding = funding;
   }
 
   get args(): IChannelStoreEntry {
-    const {
-      supportedState,
-      unsupportedStates,
-      privateKey,
-      participants,
-      channel,
-      funding,
-    }: IChannelStoreEntry = this;
-    return {
-      supportedState,
-      unsupportedStates,
-      privateKey,
-      participants,
-      channel,
-      funding,
-    };
+    const { states, privateKey, participants, channel, funding }: IChannelStoreEntry = this;
+    return { states, privateKey, participants, channel, funding };
   }
 
   get ourIndex() {
-    return this.participants.findIndex(p => p.signingAddress === this.privateKey);
+    const idx = this.participants.findIndex(
+      p => p.signingAddress === new ethers.Wallet(this.privateKey).address
+    );
+    if (idx === -1) {
+      throw 'Not found';
+    }
+    return idx;
   }
 
-  get latestSupportedState(): State | undefined {
-    const numStates = this.supportedState.length;
-    if (numStates > 0) {
-      return this.supportedState[numStates - 1].state;
-    } else {
-      return undefined;
+  get hasSupportedState(): boolean {
+    return this.states.some(supported);
+  }
+
+  get hasState(): boolean {
+    return this.states.length > 0;
+  }
+
+  get latestSupportedState(): State {
+    const signedState = this.states.find(supported);
+    if (!signedState) {
+      throw new Error('No supported state found');
     }
+
+    return signedState.state;
+  }
+
+  private signedByMe(state: State): boolean {
+    return !!this.states
+      .find(s => Store.equals(s.state, state))
+      ?.signatures.find(
+        signature => getStateSignerAddress({ state, signature }) === this.ourAddress
+      );
+  }
+
+  get latestStateSupportedByMe(): State | undefined {
+    return this.states.map(s => s.state).find(state => this.signedByMe(state));
   }
 
   get ourAddress(): string {
@@ -106,9 +131,16 @@ export class ChannelStoreEntry implements IChannelStoreEntry {
     return getChannelId(this.channel);
   }
 
-  get states(): SignedState[] {
-    return this.unsupportedStates.concat(this.supportedState);
+  get unsupportedStates(): SignedState[] {
+    if (!this.latestSupportedState) {
+      return [];
+    } else {
+      return this.states.slice(
+        this.states.map(s => s.state).indexOf(this.latestSupportedState) + 1
+      );
+    }
   }
+
   get latestState(): State {
     if (!this.states.length) {
       throw new Error('No states found');
@@ -116,7 +148,14 @@ export class ChannelStoreEntry implements IChannelStoreEntry {
     return this.states.sort(s => -s.state.turnNum)[0].state;
   }
 
+  get participantId(): string {
+    return this.participants[this.ourIndex].participantId;
+  }
+
   get recipients(): string[] {
-    return this.channel.participants.filter(p => p !== this.ourAddress);
+    return _.without(
+      this.participants.map(p => p.participantId),
+      this.participantId
+    );
   }
 }

@@ -16,7 +16,6 @@ const reducer = combineReducers({
   openGames: openGamesReducer,
 });
 
-// TODO: Get this working with a mock for channel-client
 it(
   'runs to GameOver',
   async () => {
@@ -29,7 +28,7 @@ it(
     }
     const initialState = {
       game: {
-        localState: Setup.lobby({name: 'Player A', address: 'blah'}),
+        localState: Setup.lobby({name: 'Player A', address: 'blah', outcomeAddress: 'blah'}),
         channelState: null,
       },
       openGames: [],
@@ -39,7 +38,6 @@ it(
       .withReducer(reducer, initialState)
       .silentRun(SUFFICIENT_TIME_TO_GET_TO_TURNUM_16); // Kill the saga after (hopefully) enough time. Brittle.
     expect(storeState.game.localState.type).toEqual('EndGame.GameOver');
-    expect(storeState.game.channelState.turnNum).toEqual('16');
   },
   SUFFICIENT_TIME_TO_GET_TO_TURNUM_16 + 1000
 ); // We don't want jest to timeout

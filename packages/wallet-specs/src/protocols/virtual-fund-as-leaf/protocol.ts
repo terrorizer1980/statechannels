@@ -1,7 +1,10 @@
 import { assign } from 'xstate';
-import { add, AllocationItem, Balance, Channel, getChannelId, Guarantee, store } from '../../';
+import { Guarantee } from '@statechannels/nitro-protocol/lib/src/contract/outcome';
+
+import { add, Balance, Channel, getChannelId, ethAllocationOutcome } from '../../';
 import { Init as CreateNullChannelArgs } from '../create-null-channel/protocol';
 import { Init as SupportStateArgs } from '../support-state/protocol';
+import { store } from '../../temp-store';
 
 const PROTOCOL = 'virtual-funding-as-leaf';
 
@@ -50,19 +53,7 @@ export type ChannelsKnown = Init & {
 };
 const total = (balances: Balance[]) => balances.map(b => b.wei).reduce(add);
 export function jointChannelArgs({ balances, jointChannel }: ChannelsKnown): CreateNullChannelArgs {
-  const allocation: (i: Indices) => AllocationItem = i => ({
-    destination: balances[i].address,
-    amount: balances[i].wei,
-  });
-
-  return {
-    channel: jointChannel,
-    outcome: [
-      allocation(Indices.Left),
-      { destination: jointChannel.participants[1], amount: total(balances) },
-      allocation(Indices.Right),
-    ],
-  };
+  return { channel: jointChannel };
 }
 const createJointChannel = {
   invoke: {
@@ -75,9 +66,9 @@ export function guarantorChannelArgs({ jointChannel, index }: ChannelsKnown): Gu
   const { participants } = jointChannel;
 
   return {
-    target: getChannelId(jointChannel),
+    targetChannelId: getChannelId(jointChannel),
     // Note that index in the joint channel is twice the index in the target channel
-    guarantee: [participants[2 * index], participants[1]],
+    destinations: [participants[2 * index], participants[1]],
   };
 }
 
@@ -88,15 +79,11 @@ const createGuarantorChannel = {
   },
 };
 
-export function fundGuarantorArgs({
-  guarantorChannel,
-  ledgerId,
-  balances,
-}: ChannelsKnown): SupportStateArgs {
+function fundGuarantorArgs({ guarantorChannel, ledgerId, balances }: ChannelsKnown) {
   const amount = total(balances);
   return {
     channelId: ledgerId,
-    outcome: [{ destination: getChannelId(guarantorChannel), amount }],
+    outcome: ethAllocationOutcome([{ destination: getChannelId(guarantorChannel), amount }]),
   };
 }
 const createChannels = {

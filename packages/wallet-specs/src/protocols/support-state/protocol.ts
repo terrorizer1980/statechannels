@@ -1,40 +1,43 @@
 import { Machine } from 'xstate';
-import { MachineFactory, Outcome, outcomesEqual, State } from '../..';
+import { State, getChannelId } from '@statechannels/nitro-protocol';
+
+import { MachineFactory, FINAL, statesEqual } from '../..';
+import { IStore } from '../../store';
 
 const PROTOCOL = 'support-state';
 
 export interface Init {
-  channelId: string;
-  outcome: Outcome;
+  state: State;
 }
 
-export type SendState = Init & { state: State };
-
 /*
-What happens if sendState fails
+TODO
+What happens if sendState fails?
 Do we abort? Or do we try to reach consensus on a later state?
 */
+const sendState = {
+  invoke: { src: 'sendState', onDone: 'waiting', onError: 'failure' },
+};
+
 const waiting = {
-  invoke: {
-    src: 'sendState',
-    onDone: { target: 'success', cond: 'supported' },
+  on: {
+    '': { target: 'success', cond: 'supported' },
+    '*': { target: 'success', cond: 'supported' },
   },
 };
 
 export const config = {
   key: PROTOCOL,
-  initial: 'waiting',
+  initial: 'sendState',
   states: {
+    sendState,
     waiting,
-    success: { type: 'final' as 'final' },
-  },
-  on: {
-    '*': [
-      {
-        target: 'success',
-        cond: 'supported',
+    success: { type: FINAL },
+    failure: {
+      entry: () => {
+        throw "Can't support this state";
       },
-    ],
+    },
   },
 };
 
@@ -45,7 +48,7 @@ type Services = {
   sendState(ctx: Init): any;
 };
 type Guards = {
-  supported(ctx: Init): boolean;
+  supported(ctx: Init, e: any): boolean;
 };
 
 type Options = {
@@ -53,31 +56,38 @@ type Options = {
   guards: Guards;
 };
 
-export const machine: MachineFactory<Init, any> = (store, context: Init) => {
+export type machine = typeof machine;
+export const machine: MachineFactory<Init, any> = (store: IStore, context: Init) => {
   const services: Services = {
-    sendState: ({ channelId, outcome }: Init) => {
-      const { latestState } = store.getEntry(channelId);
-      // TODO: Make this safe?
-      if (!outcomesEqual(latestState.outcome, outcome)) {
-        store.sendState({
-          ...latestState,
-          turnNum: latestState.turnNum + 1,
-          outcome,
-        });
+    sendState: async ({ state }: Init) => {
+      const entry = store.getEntry(getChannelId(state.channel));
+      const { latestStateSupportedByMe, hasSupportedState } = entry;
+      // TODO: Should these safety checks be performed in the store?
+      if (
+        // If we've haven't already signed a state, there's no harm in supporting one.
+        !latestStateSupportedByMe ||
+        // If we've already supported this state, we might as well re-send it.
+        statesEqual(latestStateSupportedByMe, state) ||
+        // Otherwise, we only send it if we haven't signed any new states.
+        (hasSupportedState &&
+          statesEqual(entry.latestSupportedState, latestStateSupportedByMe) &&
+          entry.latestSupportedState.turnNum < state.turnNum)
+      ) {
+        await store.sendState(state);
       } else {
-        store.sendState(latestState);
+        throw 'Not safe to send';
       }
     },
   };
 
   const guards: Guards = {
-    supported: ({ channelId, outcome }: Init) => {
-      const { latestSupportedState } = store.getEntry(channelId);
-      if (!latestSupportedState) {
+    supported: ({ state }: Init) => {
+      const entry = store.getEntry(getChannelId(state.channel));
+      if (!entry.hasSupportedState) {
         return false;
       }
 
-      return outcomesEqual(latestSupportedState.outcome, outcome);
+      return statesEqual(entry.latestSupportedState, state);
     },
   };
 

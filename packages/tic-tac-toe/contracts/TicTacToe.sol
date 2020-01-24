@@ -6,7 +6,7 @@ import '@statechannels/nitro-protocol/contracts/Outcome.sol';
 import 'openzeppelin-solidity/contracts/math/SafeMath.sol';
 
 /**
-  * @dev The TicTacToe contract complies with the ForceMoveApp interface and implements a commit-reveal game of Tic Tac Toe (henceforth TTT).
+  * @dev The TicTacToe contract complies with the ForceMoveApp interface and implements a game of Tic Tac Toe (henceforth TTT).
   * The following transitions are allowed:
   *
   * Start -> XPlaying  [ START ]
@@ -15,22 +15,21 @@ import 'openzeppelin-solidity/contracts/math/SafeMath.sol';
   * OPlaying -> XPlaying [ OPLAYING ]
   * OPlaying -> Victory [ VICTORY ]
   * OPlaying -> Draw [ DRAW ]
-  * Victory -> Start [ FINISH ]
-  * Draw -> Start [ FINISH ]
+  * Victory -> Switching [ SWITCH ] // Not implemented yet
+  * Draw -> Switching [ SWITCH ] // Not implemented yet
+  * Switching -> Start [ FINISH ] // Not implemented yet
   *
 */
 contract TicTacToe is ForceMoveApp {
     using SafeMath for uint256;
 
     enum PositionType {Start, XPlaying, OPlaying, Draw, Victory}
-    enum Weapon {Rock, Paper, Scissors}
 
     struct TTTData {
         PositionType positionType;
-        uint256 stake;
-        uint256[3][3] board;
-        uint256 countXs;
-        uint256 countOs;
+        uint256 stake; // this is contributed by each player. If you win, you get your stake back as well as the stake of the other player. If you lose, you lose your stake.
+        uint16 Xs; // e.g. 110000000
+        uint16 Os; // e.g. 001100000
     }
 
     /**
@@ -48,14 +47,16 @@ contract TicTacToe is ForceMoveApp {
     * @dev Encodes the TTT update rules.
     * @param fromPart State being transitioned from.
     * @param toPart State being transitioned to.
+    * @param nParticipants Amount of players. Must be 2
     * @return true if the transition conforms to the rules, false otherwise.
     */
     function validTransition(
         VariablePart memory fromPart,
         VariablePart memory toPart,
-        uint256, /* turnNumB */
-        uint256  /* nParticipants */
+        uint256, // turnNumB, (Not implemented)
+        uint256 nParticipants
     ) public pure returns (bool) {
+        require(nParticipants == 2, 'There should be 2 participants');
         Outcome.AllocationItem[] memory fromAllocation = extractAllocation(fromPart);
         Outcome.AllocationItem[] memory toAllocation = extractAllocation(toPart);
         _requireDestinationsUnchanged(fromAllocation, toAllocation);
@@ -70,8 +71,6 @@ contract TicTacToe is ForceMoveApp {
                 'Start may only transition to XPlaying'
             );
             requireValidSTARTtoXPLAYING(
-                fromPart,
-                toPart,
                 fromAllocation,
                 toAllocation,
                 fromGameData,
@@ -80,19 +79,39 @@ contract TicTacToe is ForceMoveApp {
             return true;
         } else if (fromGameData.positionType == PositionType.XPlaying) {
             if (toGameData.positionType == PositionType.OPlaying) {
-                requireValidXPLAYINGtoOPLAYING(fromAllocation, toAllocation, fromGameData, toGameData);
+                requireValidXPLAYINGtoOPLAYING(
+                    fromAllocation,
+                    toAllocation,
+                    fromGameData,
+                    toGameData
+                );
                 return true;
             } else if (toGameData.positionType == PositionType.Victory) {
-                requireValidXPLAYINGtoVICTORY(fromAllocation, toAllocation, fromGameData, toGameData);
+                requireValidXPLAYINGtoVICTORY(
+                    fromAllocation,
+                    toAllocation,
+                    fromGameData,
+                    toGameData
+                );
                 return true;
             }
             revert('XPlaying may only transition to OPlaying or Victory');
         } else if (fromGameData.positionType == PositionType.OPlaying) {
             if (toGameData.positionType == PositionType.XPlaying) {
-                requireValidOPLAYINGtoXPLAYING(fromAllocation, toAllocation, fromGameData, toGameData);
+                requireValidOPLAYINGtoXPLAYING(
+                    fromAllocation,
+                    toAllocation,
+                    fromGameData,
+                    toGameData
+                );
                 return true;
             } else if (toGameData.positionType == PositionType.Victory) {
-                requireValidOPLAYINGtoVICTORY(fromAllocation, toAllocation, fromGameData, toGameData);
+                requireValidOPLAYINGtoVICTORY(
+                    fromAllocation,
+                    toAllocation,
+                    fromGameData,
+                    toGameData
+                );
                 return true;
             } else if (toGameData.positionType == PositionType.Draw) {
                 requireValidOPLAYINGtoDRAW(fromAllocation, toAllocation, fromGameData, toGameData);
@@ -117,11 +136,7 @@ contract TicTacToe is ForceMoveApp {
         revert('No valid transition found');
     }
 
-    // action requirements
-
     function requireValidSTARTtoXPLAYING(
-        VariablePart memory fromPart,
-        VariablePart memory toPart,
         Outcome.AllocationItem[] memory fromAllocation,
         Outcome.AllocationItem[] memory toAllocation,
         TTTData memory fromGameData,
@@ -129,13 +144,23 @@ contract TicTacToe is ForceMoveApp {
     )
         private
         pure
-        outcomeUnchanged(fromPart, toPart)
+        disjointMarks(toGameData)
         stakeUnchanged(fromGameData, toGameData)
         allocationsNotLessThanStake(fromAllocation, toAllocation, fromGameData, toGameData)
     {
-        require(toGameData.countOs == 0, "No Os on board");
-        require(toGameData.countXs == 1, "One X placed");
-        // Check that only one play was made
+        require(toGameData.Os == 0, 'There should be no Os on board');
+        require(madeStrictlyOneMark(toGameData.Xs, 0), 'There should be one X placed');
+
+        // Current X Player should get all the stake. This is to decrease griefing.
+        // We assume that X Player is Player A
+        require(
+            toAllocation[0].amount == fromAllocation[0].amount.add(toGameData.stake),
+            'Allocation for player A should be incremented by 1x stake'
+        );
+        require(
+            toAllocation[1].amount == fromAllocation[1].amount.sub(toGameData.stake),
+            'Allocation for player B should be decremented by 1x stake.'
+        );
     }
 
     function requireValidXPLAYINGtoOPLAYING(
@@ -146,13 +171,22 @@ contract TicTacToe is ForceMoveApp {
     )
         private
         pure
-        allocationUnchanged(fromAllocation, toAllocation)
+        disjointMarks(toGameData)
         stakeUnchanged(fromGameData, toGameData)
+        allocationsNotLessThanStake(fromAllocation, toAllocation, fromGameData, toGameData)
     {
-        require(toGameData.countOs == fromGameData.countOs + 1, "One O placed");
-        require(toGameData.countXs == fromGameData.countXs, "No Xs placed");
-        // Check that only one play was made
-        // Check that play doesn't overwrite old board
+        require(toGameData.Xs == fromGameData.Xs, 'There should be no new Xs added to board');
+        require(madeStrictlyOneMark(toGameData.Os, fromGameData.Os), 'There should be one new O placed');
+
+        // Current O Player should get all the stake. This is to decrease griefing. We assume that O Player is Player B
+        require(
+            toAllocation[0].amount == fromAllocation[0].amount.sub(toGameData.stake.mul(2)),
+            'Allocation for player A should be decremented by 1x stake'
+        );
+        require(
+            toAllocation[1].amount == fromAllocation[1].amount.add(toGameData.stake.mul(2)),
+            'Allocation for player B should be incremented by 1x stake.'
+        );
     }
 
     function requireValidOPLAYINGtoXPLAYING(
@@ -163,13 +197,22 @@ contract TicTacToe is ForceMoveApp {
     )
         private
         pure
-        allocationUnchanged(fromAllocation, toAllocation)
+        disjointMarks(toGameData)
         stakeUnchanged(fromGameData, toGameData)
+        allocationsNotLessThanStake(fromAllocation, toAllocation, fromGameData, toGameData)
     {
-        require(toGameData.countXs == fromGameData.countXs + 1, "One X placed");
-        require(toGameData.countOs == fromGameData.countOs, "No Os placed");
-        // Check that only one play was made
-        // Check that play doesn't overwrite old board
+        require(toGameData.Os == fromGameData.Os, 'There should be no new Os added to board');
+        require(madeStrictlyOneMark(toGameData.Xs, fromGameData.Xs), 'There should be one new X placed');
+
+        // Current X Player should get all the stake. This is to decrease griefing. We assume that X Player is Player A
+        require(
+            toAllocation[0].amount == fromAllocation[0].amount.add(toGameData.stake*2),
+            'Allocation for player A should be incremented by 1x stake'
+        );
+        require(
+            toAllocation[1].amount == fromAllocation[1].amount.sub(toGameData.stake*2),
+            'Allocation for player B should be decremented by 1x stake.'
+        );
     }
 
     function requireValidXPLAYINGtoVICTORY(
@@ -177,34 +220,44 @@ contract TicTacToe is ForceMoveApp {
         Outcome.AllocationItem[] memory toAllocation,
         TTTData memory fromGameData,
         TTTData memory toGameData
-    ) private pure stakeUnchanged(fromGameData, toGameData) {
-        require(toGameData.countXs == fromGameData.countXs + 1, "One X placed");
-        require(toGameData.countOs == fromGameData.countOs, "No Os placed");
-        // Check that only one play was made
-        // Check that X has won
+    )
+        private
+        pure
+        disjointMarks(toGameData)
+        stakeUnchanged(fromGameData, toGameData)
+    {
+        require(toGameData.Xs == fromGameData.Xs, 'There should be no new Xs added to board');
+        require(madeStrictlyOneMark(toGameData.Os, fromGameData.Os), 'There should be one new O placed');
+        require(hasWon(toGameData.Os), 'The move should result in O winning');
 
-        uint256 playerAWinnings; // playerOneWinnings
-        uint256 playerBWinnings; // playerTwoWinnings
-        // calculate winnings
-        (playerAWinnings, playerBWinnings) = winnings(
-            toGameData.board,
-            toGameData.stake
-        );
+        uint256 currentOsPlayer = 1; // Need to calculate this
+
+        // Recall that in the past state, the allocations are as if Player B has lost.
+        // First, undo this
+        uint256 correctAmountA = fromAllocation[0].amount.sub(fromGameData.stake);
+        uint256 correctAmountB = fromAllocation[1].amount.add(fromGameData.stake);
+    
+        if (currentOsPlayer == 0) {
+            // player A won
+            correctAmountA = correctAmountA.add(fromGameData.stake);
+            correctAmountB = correctAmountB.sub(fromGameData.stake);
+        } else {
+            // player B won
+            correctAmountA = correctAmountA.sub(fromGameData.stake);
+            correctAmountB = correctAmountB.add(fromGameData.stake);
+        }
 
         require(
-            toAllocation[0].amount == fromAllocation[0].amount.add(playerAWinnings),
-            "Player A's allocation should be updated with the winnings."
+            toAllocation[0].amount == correctAmountA,
+            "Player A's allocation should reflect the result of the game."
         );
         require(
-            toAllocation[1].amount ==
-                fromAllocation[1].amount.sub(fromGameData.stake.mul(2)).add(playerBWinnings),
-            "Player B's allocation should be updated with the winnings."
+            toAllocation[1].amount == correctAmountB,
+            "Player B's allocation should reflect the result of the game."
         );
     }
 
     function requireValidOPLAYINGtoVICTORY(
-        VariablePart memory fromPart,
-        VariablePart memory toPart,
         Outcome.AllocationItem[] memory fromAllocation,
         Outcome.AllocationItem[] memory toAllocation,
         TTTData memory fromGameData,
@@ -212,31 +265,37 @@ contract TicTacToe is ForceMoveApp {
     )
         private
         pure
-        outcomeUnchanged(fromPart, toPart)
+        disjointMarks(toGameData)
         stakeUnchanged(fromGameData, toGameData)
-        allocationsNotLessThanStake(fromAllocation, toAllocation, fromGameData, toGameData)
     {
-        require(toGameData.countOs == fromGameData.countOs + 1, "One O placed");
-        require(toGameData.countXs == fromGameData.countXs, "No Xs placed");
-        // Check that only one play was made
-        // Check that O has won
+        require(toGameData.Os == fromGameData.Os, 'There should be no new Os added to board');
+        require(madeStrictlyOneMark(toGameData.Xs, fromGameData.Xs), 'There should be one new X placed');
+        require(hasWon(toGameData.Xs), 'The move should result in X winning');
 
-        uint256 playerAWinnings; // playerOneWinnings
-        uint256 playerBWinnings; // playerTwoWinnings
-        // calculate winnings
-        (playerAWinnings, playerBWinnings) = winnings(
-            toGameData.board,
-            toGameData.stake
-        );
+        uint256 currentXsPlayer = 0; // Need to calculate this
+
+        // Recall that in the past state, the allocations are as if Player A has lost.
+        // First, undo this
+        uint256 correctAmountA = fromAllocation[0].amount.add(fromGameData.stake);
+        uint256 correctAmountB = fromAllocation[1].amount.sub(fromGameData.stake);
+    
+        if (currentXsPlayer == 0) {
+            // player A won
+            correctAmountA = correctAmountA.add(fromGameData.stake);
+            correctAmountB = correctAmountB.sub(fromGameData.stake);
+        } else {
+            // player B won
+            correctAmountA = correctAmountA.sub(fromGameData.stake);
+            correctAmountB = correctAmountB.add(fromGameData.stake);
+        }
 
         require(
-            toAllocation[0].amount == fromAllocation[0].amount.add(playerAWinnings),
-            "Player A's allocation should be updated with the winnings."
+            toAllocation[0].amount == correctAmountA,
+            "Player A's allocation should reflect the result of the game."
         );
         require(
-            toAllocation[1].amount ==
-                fromAllocation[1].amount.sub(fromGameData.stake.mul(2)).add(playerBWinnings),
-            "Player B's allocation should be updated with the winnings."
+            toAllocation[1].amount == correctAmountB,
+            "Player B's allocation should reflect the result of the game."
         );
     }
 
@@ -248,12 +307,24 @@ contract TicTacToe is ForceMoveApp {
     )
         private
         pure
-        allocationUnchanged(fromAllocation, toAllocation)
+        disjointMarks(toGameData)
         stakeUnchanged(fromGameData, toGameData)
     {
-        require(toGameData.countOs == fromGameData.countOs + 1, "One O placed");
-        require(toGameData.countXs == fromGameData.countXs, "No Xs placed");
-        //Check that this is draw. Board is full
+        require(isDraw(toGameData.Os, toGameData.Xs), "The board should be full and result in a draw");
+        require(toGameData.Os == fromGameData.Os, 'There should be no new Os added to board');
+        require(madeStrictlyOneMark(toGameData.Xs, fromGameData.Xs), "There should be one new X placed");
+
+        // Recall that in the past state, the allocations are as if Player A has lost.
+        // TODO This logic will only work if PlayerA is Xs and PlayerB is Os
+        require(
+            toAllocation[0].amount == fromAllocation[0].amount.add(toGameData.stake),
+            "Player A's allocation should reflect the result of the game."
+        );
+        require(
+            toAllocation[1].amount ==
+                fromAllocation[1].amount.sub(toGameData.stake),
+            "Player B's allocation should reflect the result of the game."
+        );
     }
 
     function requireValidDRAWtoSTART(
@@ -266,7 +337,10 @@ contract TicTacToe is ForceMoveApp {
         pure
         allocationUnchanged(fromAllocation, toAllocation)
         stakeUnchanged(fromGameData, toGameData)
-    {}
+    {
+        require(toGameData.Os == 0, 'The Os should be reset to 0');
+        require(toGameData.Xs == 0, 'The Xs should be reset to 0');
+    }
 
     function requireValidVICTORYtoSTART(
         Outcome.AllocationItem[] memory fromAllocation,
@@ -278,7 +352,10 @@ contract TicTacToe is ForceMoveApp {
         pure
         allocationUnchanged(fromAllocation, toAllocation)
         stakeUnchanged(fromGameData, toGameData)
-    {}
+    {
+        require(toGameData.Os == 0, 'The Os should be reset to 0');
+        require(toGameData.Xs == 0, 'The Xs should be reset to 0');
+    }
 
     function extractAllocation(VariablePart memory variablePart)
         private
@@ -311,49 +388,35 @@ contract TicTacToe is ForceMoveApp {
         return allocation;
     }
 
-    function winnings(Weapon aWeapon, Weapon bWeapon, uint256 stake)
-        private
-        pure
-        returns (uint256, uint256)
-    {
-        if (aWeapon == bWeapon) {
-            return (stake, stake);
-        } else if ((aWeapon == Weapon.Rock && bWeapon == Weapon.Scissors) || (aWeapon > bWeapon)) {
-            // first player won
-            return (2 * stake, 0);
-        } else {
-            // second player won
-            return (0, 2 * stake);
-        }
-    }
-
     function _requireDestinationsUnchanged(
         Outcome.AllocationItem[] memory fromAllocation,
         Outcome.AllocationItem[] memory toAllocation
     ) private pure {
         require(
             toAllocation[0].destination == fromAllocation[0].destination,
-            'TicTacToe: Destimation playerA may not change'
+            'TicTacToe: Destination playerA may not change'
         );
         require(
             toAllocation[1].destination == fromAllocation[1].destination,
-            'TicTacToe: Destimation playerB may not change'
+            'TicTacToe: Destination playerB may not change'
         );
     }
 
     // modifiers
     modifier outcomeUnchanged(VariablePart memory a, VariablePart memory b) {
-        require(
-            keccak256(b.outcome) == keccak256(a.outcome),
-            'TicTacToe: Outcome must not change'
-        );
+        require(keccak256(b.outcome) == keccak256(a.outcome), 'TicTacToe: Outcome must not change');
+        _;
+    }
+
+    modifier disjointMarks(TTTData memory toGameData) {
+        require(areDisjoint(toGameData.Xs, toGameData.Os), 'TicTacToe: No Disjoint Moves');
         _;
     }
 
     modifier stakeUnchanged(TTTData memory fromGameData, TTTData memory toGameData) {
         require(
             fromGameData.stake == toGameData.stake,
-            'The stake should be the same between commitments'
+            'The stake should be the same'
         );
         _;
     }
@@ -381,11 +444,11 @@ contract TicTacToe is ForceMoveApp {
     ) {
         require(
             toAllocation[0].destination == fromAllocation[0].destination,
-            'TicTacToe: Destimation playerA may not change'
+            'TicTacToe: Destination playerA may not change'
         );
         require(
             toAllocation[1].destination == fromAllocation[1].destination,
-            'TicTacToe: Destimation playerB may not change'
+            'TicTacToe: Destination playerB may not change'
         );
         require(
             toAllocation[0].amount == fromAllocation[0].amount,
@@ -396,5 +459,93 @@ contract TicTacToe is ForceMoveApp {
             'TicTacToe: Amount playerB may not change'
         );
         _;
+    }
+
+    // helper functions
+
+    // Unravelling of grid is as follows:
+    //
+    //      0  |  1  |  2
+    //   +-----------------+
+    //      3  |  4  |  5
+    //   +-----------------+
+    //      6  |  7  |  8
+    //
+    // The binary representation A single mark is 2**(8-index).
+    //
+    // e.g. Os = 000000001
+    //      Xs = 010000000
+    //
+    // corresponds to
+    //
+    //         |  X  |
+    //   +-----------------+
+    //         |     |
+    //   +-----------------+
+    //         |     |  0
+    //
+    uint16 constant topRow = 448; /*  0b111000000 = 448 mask for win @ row 1 */
+    uint16 constant midRow = 56; /*  0b000111000 =  56 mask for win @ row 2 */
+    uint16 constant botRow = 7; /*  0b000000111 =   7 mask for win @ row 3 */
+    uint16 constant lefCol = 292; /*  0b100100100 = 292 mask for win @ col 1 */
+    uint16 constant midCol = 146; /*  0b010010010 = 146 mask for win @ col 2 */
+    uint16 constant rigCol = 73; /*  0b001001001 =  73 mask for win @ col 3 */
+    uint16 constant dhDiag = 273; /*  0b100010001 = 273 mask for win @ downhill diag */
+    uint16 constant uhDiag = 84; /*  0b001010100 =  84 mask for win @ uphill diag */
+    //
+    uint16 constant fullBd = 511; /*  0b111111111 = 511 full board */
+
+    // Xs = 111000100 & topRow = 111000000 === WIN
+    function hasWon(uint16 _marks) public pure returns (bool) {
+        return (((_marks & topRow) == topRow) ||
+            ((_marks & midRow) == midRow) ||
+            ((_marks & botRow) == botRow) ||
+            ((_marks & lefCol) == lefCol) ||
+            ((_marks & midCol) == midCol) ||
+            ((_marks & rigCol) == rigCol) ||
+            ((_marks & dhDiag) == dhDiag) ||
+            ((_marks & uhDiag) == uhDiag));
+    }
+
+    // Xs === 111100001; Os === 000011110; DRAW
+    function isDraw(uint16 _Os, uint16 _Xs) public pure returns (bool) {
+        if ((_Os ^ _Xs) == fullBd) {
+            return true; // using XOR. Note that a draw could include a winning position that is unnoticed / unclaimed
+        } else return false;
+    }
+
+    // Valid
+    // OLD: Xs = 1100000000
+    // NEW: Xs = 1100000001
+    // Invalid - Erased
+    // OLD: Xs = 1100000001
+    // NEW: Xs = 1100000000
+    // Invalid - Double move
+    // OLD: Xs = 1100000000
+    // NEW: Xs = 1100000011
+    function madeStrictlyOneMark(uint16 _new_marks, uint16 _old_marks) public pure returns (bool) {
+        uint16 i;
+        bool already_marked = false;
+        for (i = 0; i < 9; i++) {
+            if ((_new_marks >> i) % 2 == 0 && (_old_marks >> i) % 2 == 1) {
+                return false; // erased a mark
+            } else if ((_new_marks >> i) % 2 == 1 && (_old_marks >> i) % 2 == 0) {
+                if (already_marked == true) {
+                    return false; // made two or more marks
+                }
+                already_marked = true; // made at least one mark
+            }
+        }
+        if (_new_marks == _old_marks) {
+            return false;
+        } // do not allow a non-move
+        return true;
+    }
+
+    // Checks that no mark was overriden
+    function areDisjoint(uint16 _Os, uint16 _Xs) public pure returns (bool) {
+        if ((_Os & _Xs) == 0) {
+            return true;
+        } else return false;
     }
 }

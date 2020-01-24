@@ -1,4 +1,6 @@
-import { Channel, Outcome, SignedState, State } from '.';
+import { State } from '@statechannels/nitro-protocol';
+
+import { Channel, SignedState, ethAllocationOutcome } from '.';
 
 interface ChannelParticipant {
   participantId?: string;
@@ -61,10 +63,10 @@ export function createStateFromCreateChannelParams(params: JsonRpcCreateChannelP
   };
   return {
     channel,
-    challengeDuration: '0x42',
+    challengeDuration: 0x42, // TODO
     appData,
     appDefinition,
-    outcome: params.allocations,
+    outcome: ethAllocationOutcome(params.allocations),
     turnNum: 0,
     isFinal: false,
   };
@@ -84,7 +86,7 @@ export function createStateFromUpdateChannelParams(
   return {
     ...state,
     turnNum: state.turnNum + 1,
-    outcome: allocations,
+    outcome: ethAllocationOutcome(allocations),
     appData,
   };
 }
