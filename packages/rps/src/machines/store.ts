@@ -22,6 +22,7 @@ import {rps} from '../xstate/xstate';
 // Interpret the machine, and add a listener for whenever a transition occurs.
 const service = interpret(rps, {devTools: true}).onTransition(state => {
   console.log(state.value);
+  console.log(state.context);
 });
 service.start();
 

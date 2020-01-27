@@ -1,8 +1,6 @@
 import {ChannelState, Result, Weapon} from '../../core';
-import {StateNodeConfig} from 'xstate';
+import {StateNodeConfig, assign, MachineConfig} from 'xstate';
 import {GameAction} from './actions';
-
-type TContext = any;
 
 export interface GameState {
   localState: LocalState;
@@ -385,7 +383,7 @@ interface PlayerASchema {
     Resigned: any;
   };
 }
-const PlayerAStates: StateNodeConfig<TContext, PlayerASchema, GameAction> = {
+const PlayerAStates: StateNodeConfig<any, PlayerASchema, GameAction> = {
   initial: 'GameChosen',
   states: {
     GameChosen: {on: {StartRound: 'ChooseWeapon'}},
@@ -419,7 +417,7 @@ interface PlayerBSchema {
     Resigned: any;
   };
 }
-const PlayerBStates: StateNodeConfig<TContext, PlayerBSchema, GameAction> = {
+const PlayerBStates: StateNodeConfig<any, PlayerBSchema, GameAction> = {
   initial: 'CreatingOpenGame',
   states: {
     CreatingOpenGame: {on: {CreateGame: 'WaitingRoom'}},
@@ -451,33 +449,64 @@ interface GameSchema {
     GameOver: any;
   };
 }
-export const game: StateNodeConfig<TContext, GameSchema, GameAction> = {
+export const game: MachineConfig<any, GameSchema, GameAction> = {
   initial: 'Empty',
   states: {
     Empty: {
       on: {
-        UpdateProfile: 'NeedAddress',
+        UpdateProfile: {
+          target: 'NeedAddress',
+          actions: [
+            assign({
+              name: (context, event) => event.name,
+            }),
+          ],
+        },
       },
     },
     NeedAddress: {
       on: {
-        GotAddressFromWallet: 'Lobby',
+        GotAddressFromWallet: {
+          target: 'Lobby',
+          actions: [
+            assign({
+              address: (context, event) => event.address,
+              outcomeAddress: (context, event) => event.outcomeAddress,
+            }),
+          ],
+        },
       },
     },
     Lobby: {
       on: {
-        JoinOpenGame: 'PlayerA',
-        NewOpenGame: 'PlayerB',
+        JoinOpenGame: {
+          target: 'PlayerA',
+          actions: [
+            assign({
+              opponentName: (context, event) => event.opponentName,
+              opponentAddress: (context, event) => event.opponentAddress,
+              opponentOutcomeAddress: (context, event) => event.opponentOutcomeAddress,
+              roundBuyIn: (context, event) => event.opponentOutcomeAddress,
+            }),
+          ],
+        },
+        NewOpenGame: {
+          target: 'PlayerB',
+        },
       },
     },
     PlayerA: {
-      on: {GameOver: 'GameOver'},
+      on: {GameOver: {target: 'GameOver', actions: []}},
       ...PlayerAStates,
     },
     PlayerB: {
-      on: {GameOver: 'GameOver'},
+      on: {GameOver: {target: 'GameOver', actions: []}},
       ...PlayerBStates,
     },
-    GameOver: {on: {ExitToLobby: 'Lobby'}},
+    GameOver: {on: {ExitToLobby: {target: 'Lobby', actions: []}}},
   },
 };
+
+// function setContext(event: EventObject, keys: string[]) {
+//   return keys.map(key => assign({key: (context, event) => event[key]}));
+// }
