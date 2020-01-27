@@ -472,12 +472,14 @@ export const game: MachineConfig<any, GameSchema, GameAction> = {
             assign({
               address: (context, event) => event.address,
               outcomeAddress: (context, event) => event.outcomeAddress,
+              openGames: [],
             }),
           ],
         },
       },
     },
     Lobby: {
+      activities: ['syncOpenGames'],
       on: {
         JoinOpenGame: {
           target: 'PlayerA',
