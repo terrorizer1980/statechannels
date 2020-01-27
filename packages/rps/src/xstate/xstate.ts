@@ -30,12 +30,20 @@ export const rps = createMachine<TContext, TEvent, TState>(
       syncOpenGames: (context, activity) => {
         const openGamesRef = firebase.database().ref('/challenges/');
         openGamesRef.on('value', function(snapshot) {
-          console.log(snapshot.val());
           context.openGames = snapshot.val();
         });
         return () => {
+          context.openGames = [];
           openGamesRef.off('value');
         };
+      },
+    },
+    guards: {
+      sufficientFunds: (context, event) => {
+        return event.fundingSituation === 'Ok';
+      },
+      insufficientFunds: (context, event) => {
+        return event.fundingSituation !== 'Ok';
       },
     },
   }

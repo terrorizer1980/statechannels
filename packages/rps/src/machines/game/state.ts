@@ -420,15 +420,70 @@ interface PlayerBSchema {
 const PlayerBStates: StateNodeConfig<any, PlayerBSchema, GameAction> = {
   initial: 'CreatingOpenGame',
   states: {
-    CreatingOpenGame: {on: {CreateGame: 'WaitingRoom'}},
-    WaitingRoom: {on: {GameJoined: 'OpponentJoined'}},
-    OpponentJoined: {on: {StartRound: 'ChooseWeapon'}},
-    ChooseWeapon: {on: {ChooseWeapon: 'WeaponChosen'}},
+    CreatingOpenGame: {
+      on: {
+        CreateGame: {
+          target: 'WaitingRoom',
+          actions: [
+            assign({
+              roundBuyIn: (context, event) => event.roundBuyIn,
+            }),
+          ],
+        },
+      },
+    },
+    WaitingRoom: {
+      on: {
+        GameJoined: {
+          target: 'OpponentJoined',
+          actions: [
+            assign({
+              opponentName: (context, event) => event.opponentName,
+              opponentAddress: (context, event) => event.opponentAddress,
+              opponentOutcomeAddress: (context, event) => event.opponentOutcomeAddress,
+            }),
+          ],
+        },
+      },
+    },
+    OpponentJoined: {on: {StartRound: {target: 'ChooseWeapon'}}},
+    ChooseWeapon: {
+      on: {
+        ChooseWeapon: {
+          target: 'WeaponChosen',
+          actions: [
+            assign({
+              myWeapon: (context, event) => event.myWeapon,
+            }),
+          ],
+        },
+      },
+    },
     WeaponChosen: {
       on: {
         ResultArrived: [
-          {target: 'ResultPlayAgain', cond: 'sufficientFunds'},
-          {target: 'InsufficientFunds', cond: 'insufficientFunds'},
+          {
+            target: 'ResultPlayAgain',
+            cond: 'sufficientFunds',
+            actions: [
+              assign({
+                theirWeapon: (context, event) => event.theirWeapon,
+                result: (context, event) => event.result,
+                fundingSituation: (context, event) => event.fundingSituation,
+              }),
+            ],
+          },
+          {
+            target: 'InsufficientFunds',
+            cond: 'insufficientFunds',
+            actions: [
+              assign({
+                theirWeapon: (context, event) => event.theirWeapon,
+                result: (context, event) => event.result,
+                fundingSituation: (context, event) => event.fundingSituation,
+              }),
+            ],
+          },
         ],
       },
     },
