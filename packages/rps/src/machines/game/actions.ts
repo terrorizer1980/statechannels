@@ -15,7 +15,8 @@ export type GameAction =
   | StartRound
   | Resign
   | GameOver
-  | ExitToLobby;
+  | ExitToLobby
+  | UpdateChannelState;
 
 export interface UpdateProfile {
   type: 'UpdateProfile';

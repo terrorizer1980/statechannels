@@ -547,6 +547,7 @@ interface GameSchema {
   };
 }
 export const game: MachineConfig<any, GameSchema, GameAction> = {
+  id: 'game',
   initial: 'Empty',
   states: {
     Empty: {
@@ -603,6 +604,16 @@ export const game: MachineConfig<any, GameSchema, GameAction> = {
       ...PlayerBStates,
     },
     GameOver: {on: {ExitToLobby: {target: 'Lobby', actions: []}}},
+  },
+  on: {
+    UpdateChannelState: {
+      target: 'game',
+      actions: [
+        assign({
+          channelState: (context, event) => event.channelState,
+        }),
+      ],
+    },
   },
 };
 
