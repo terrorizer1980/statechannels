@@ -386,14 +386,56 @@ interface PlayerASchema {
 const PlayerAStates: StateNodeConfig<any, PlayerASchema, GameAction> = {
   initial: 'GameChosen',
   states: {
-    GameChosen: {on: {StartRound: 'ChooseWeapon'}},
-    ChooseWeapon: {on: {ChooseWeapon: 'WeaponChosen'}},
-    WeaponChosen: {on: {ChooseSalt: 'WeaponAndSaltChosen'}},
+    GameChosen: {on: {StartRound: {target: 'ChooseWeapon'}}},
+    ChooseWeapon: {
+      on: {
+        ChooseWeapon: {
+          target: 'WeaponChosen',
+          actions: [
+            assign({
+              myWeapon: (context, event) => event.myWeapon,
+            }),
+          ],
+        },
+      },
+    },
+    WeaponChosen: {
+      on: {
+        ChooseSalt: {
+          target: 'WeaponAndSaltChosen',
+          actions: [
+            assign({
+              salt: (context, event) => event.salt,
+            }),
+          ],
+        },
+      },
+    },
     WeaponAndSaltChosen: {
       on: {
         ResultArrived: [
-          {target: 'ResultPlayAgain', cond: 'sufficientFunds'},
-          {target: 'InsufficientFunds', cond: 'insufficientFunds'},
+          {
+            target: 'ResultPlayAgain',
+            cond: 'sufficientFunds',
+            actions: [
+              assign({
+                theirWeapon: (context, event) => event.theirWeapon,
+                result: (context, event) => event.result,
+                fundingSituation: (context, event) => event.fundingSituation,
+              }),
+            ],
+          },
+          {
+            target: 'InsufficientFunds',
+            cond: 'insufficientFunds',
+            actions: [
+              assign({
+                theirWeapon: (context, event) => event.theirWeapon,
+                result: (context, event) => event.result,
+                fundingSituation: (context, event) => event.fundingSituation,
+              }),
+            ],
+          },
         ],
       },
     },
