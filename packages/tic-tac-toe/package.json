@@ -132,6 +132,7 @@
     "ember-qunit": "^4.6.0",
     "ember-resolver": "^7.0.0",
     "ember-source": "~3.15.0",
+    "ember-svg-jar": "^2.2.3",
     "ember-template-lint": "^1.13.2",
     "enzyme": "^3.11.0",
     "enzyme-adapter-react-16": "^1.15.2",
