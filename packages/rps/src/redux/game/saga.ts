@@ -1,4 +1,4 @@
-import {select, call, put, take, actionChannel} from 'redux-saga/effects';
+import {select, call, put, putResolve, take, actionChannel} from 'redux-saga/effects';
 import {RPSChannelClient} from '../../utils/rps-channel-client';
 import {
   AppData,
@@ -39,7 +39,15 @@ const isPlayersTurnNext = (
 export function* gameSaga(client: RPSChannelClient) {
   const channel = yield actionChannel('*', buffers.fixed(10));
   while (true) {
-    yield take(channel);
+    const action = yield take(channel);
+
+    if (action.type === 'Challenge') {
+      const {
+        channelState: {channelId},
+      } = yield select(getGameState);
+      yield challengeChannel(channelId, client);
+    }
+
     yield* gameSagaRun(client);
   }
 }
@@ -48,7 +56,6 @@ function* gameSagaRun(client: RPSChannelClient) {
   const {localState, channelState}: ls.GameState = yield select(getGameState);
 
   if (
-    !isPlayersTurnNext(localState, channelState) &&
     cs.isClosed(channelState) &&
     localState.type !== 'A.InsufficientFunds' &&
     localState.type !== 'B.InsufficientFunds' &&
@@ -98,7 +105,7 @@ function* gameSagaRun(client: RPSChannelClient) {
       }
       break;
     case 'A.WeaponAndSaltChosen':
-      if (cs.inRoundAccepted(channelState)) {
+      if (cs.inRoundAccepted(channelState) && !cs.isChallengingOrResponding(channelState)) {
         yield* calculateResultAndSendReveal(localState, channelState, client);
       }
       break;
@@ -138,6 +145,8 @@ function* gameSagaRun(client: RPSChannelClient) {
       if (channelState) {
         yield put(a.updateChannelState(null));
       }
+      // eslint-disable-next-line
+      opponentResigned = false;
       break;
   }
 }
@@ -146,7 +155,7 @@ function* createChannel(localState: ls.A.GameChosen, client: RPSChannelClient) {
   const openingBalance = bigNumberify(localState.roundBuyIn)
     .mul(5)
     .toString();
-  const startState: AppData = {type: 'start'};
+  const startState: AppData = {type: 'start', stake: localState.roundBuyIn};
   const newChannelState = yield call(
     [client, 'createChannel'],
     localState.address,
@@ -276,6 +285,7 @@ function* calculateResultAndSendReveal(
   const reveal: AppData = {
     type: 'reveal',
     salt,
+    stake,
     playerAWeapon: myWeapon,
     playerBWeapon: theirWeapon,
   };
@@ -291,7 +301,7 @@ function* calculateResultAndSendReveal(
     aOutcomeAddress,
     bOutcomeAddress
   );
-  yield put(a.updateChannelState(updatedChannelState));
+  yield putResolve(a.updateChannelState(updatedChannelState));
   yield put(a.resultArrived(theirWeapon, result, fundingSituation));
 }
 
@@ -322,7 +332,7 @@ function* sendStartAndStartRound(channelState: ChannelState<Reveal>, client: RPS
     aOutcomeAddress,
     bOutcomeAddress,
   } = channelState;
-  const start: AppData = {type: 'start'};
+  const start: AppData = {type: 'start', stake: channelState.appData.stake};
   const state = yield call(
     [client, 'updateChannel'],
     channelId,
@@ -337,9 +347,15 @@ function* sendStartAndStartRound(channelState: ChannelState<Reveal>, client: RPS
   yield put(a.updateChannelState(state));
   yield put(a.startRound());
 }
+
 function* closeChannel(channelState: ChannelState, client: RPSChannelClient) {
   const closingChannelState = yield call([client, 'closeChannel'], channelState.channelId);
   yield put(a.updateChannelState(closingChannelState));
+}
+
+function* challengeChannel(channelId: string, client: RPSChannelClient) {
+  const challengeState = yield call([client, 'challengeChannel'], channelId);
+  yield put(a.updateChannelState(challengeState));
 }
 
 const calculateFundingSituation = (

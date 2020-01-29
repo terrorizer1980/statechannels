@@ -1,13 +1,19 @@
 import {Actor, Interpreter, interpret} from 'xstate';
-import {IStore, ChannelUpdated} from '@statechannels/wallet-protocols/src/store';
 import {
+  Store,
+  ChannelUpdated,
   CreateChannelEvent,
-  OpenChannelEvent
-} from '@statechannels/wallet-protocols/src/protocols/wallet/protocol';
-import {applicationWorkflow, ApplicationWorkflowEvent} from './workflows/application';
-import {SendStates} from '@statechannels/wallet-protocols/src/wire-protocol';
+  OpenChannelEvent,
+  SendStates
+} from '@statechannels/wallet-protocols';
 
-// TODO: We should standardize logging with wallet-specs
+import {applicationWorkflow, ApplicationWorkflowEvent} from './workflows/application';
+import {Guid} from 'guid-typescript';
+import WalletUi from './ui/wallet';
+import React from 'react';
+import ReactDOM from 'react-dom';
+
+// TODO: We should standardize logging with wallet-protocols
 function logState(actor, level = 0) {
   if (actor.state) {
     console.log(`${' '.repeat(level)}${JSON.stringify(actor.state.value)}`);
@@ -17,37 +23,58 @@ function logState(actor, level = 0) {
   }
 }
 
+export type Event =
+  | CreateChannelEvent
+  | OpenChannelEvent
+  | SendStates
+  | ChannelUpdated
+  | ApplicationWorkflowEvent;
 export interface Workflow {
+  id: string;
   machine: Interpreter<any, any, any>;
   domain: string; // TODO: Is this useful?
 }
 
 export class WorkflowManager {
   workflows: Workflow[];
-  store: IStore;
-  constructor(store: IStore) {
+  store: Store;
+  tempMachine;
+  constructor(store: Store) {
     this.workflows = [];
     this.store = store;
   }
 
-  dispatchToWorkflows(
-    event:
-      | CreateChannelEvent
-      | OpenChannelEvent
-      | SendStates
-      | ChannelUpdated
-      | ApplicationWorkflowEvent
-  ) {
-    if (event.type && (event.type === 'CREATE_CHANNEL' || event.type === 'OPEN_CHANNEL')) {
-      const machine = interpret<any, any, any>(applicationWorkflow(this.store), {
-        devTools: true
+  private renderUI(machine) {
+    ReactDOM.render(
+      React.createElement(WalletUi, {workflow: machine}),
+      document.getElementById('root')
+    );
+  }
+
+  private startWorkflow(event: Event): void {
+    const id = Guid.create().toString();
+    const machine = interpret<any, any, any>(applicationWorkflow(this.store), {
+      devTools: true
+    })
+      .onTransition(state => {
+        logState({state});
+        console.log(JSON.stringify(state.context));
       })
-        .onTransition(state => {
-          logState({state});
-        })
-        .start();
-      this.workflows.push({machine, domain: ''});
+      .onEvent(console.log)
+      .onDone(() => (this.workflows = this.workflows.filter(w => w.id !== id)))
+      .start();
+    // TODO: Figure out how to resolve rendering priorities
+    this.renderUI(machine);
+    // Register for ChannelUpdated events
+    this.store.on('CHANNEL_UPDATED', (event: ChannelUpdated) => machine.send(event));
+    this.workflows.push({id, machine, domain: 'TODO'});
+  }
+
+  dispatchToWorkflows(event: Event) {
+    if (event.type && (event.type === 'CREATE_CHANNEL' || event.type === 'OPEN_CHANNEL')) {
+      this.startWorkflow(event);
     }
+
     this.workflows.forEach(w => w.machine.send(event));
   }
 }

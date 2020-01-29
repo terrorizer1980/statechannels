@@ -1,23 +1,25 @@
-import {handleMessage, sendMessage, dispatchChannelUpdatedMessage} from './messaging';
+import {handleMessage, sendMessage} from './messaging';
 
-import {IStore} from '@statechannels/wallet-protocols/lib/src/store';
+import {Store, EphemeralStore} from '@statechannels/wallet-protocols/';
 import {ethers} from 'ethers';
-import {Store} from './storage/store';
+
 import {ChainWatcher} from './chain';
 import {WorkflowManager} from './workflow-manager';
+import {ETH_ASSET_HOLDER_ADDRESS} from './constants';
 
 const ourWallet = ethers.Wallet.createRandom();
 
 const chain = new ChainWatcher();
 
-const store: IStore = new Store({
+const store: Store = new EphemeralStore({
   chain,
   privateKeys: {
     [ourWallet.address]: ourWallet.privateKey
   },
-  messageSender: sendMessage,
-  channelUpdateListener: dispatchChannelUpdatedMessage
+  messagingService: {sendMessage},
+  ethAssetHolderAddress: ETH_ASSET_HOLDER_ADDRESS
 });
+
 const workflowManager = new WorkflowManager(store);
 
 window.addEventListener('message', async event => {
