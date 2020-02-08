@@ -2,15 +2,15 @@ import { Allocation, Outcome } from '@statechannels/nitro-protocol';
 import { Machine, MachineConfig } from 'xstate';
 import _ from 'lodash';
 import { bigNumberify } from 'ethers/utils';
-import { HashZero, AddressZero } from 'ethers/constants';
+import { AddressZero, HashZero } from 'ethers/constants';
 
-import { getDataAndInvoke } from '../../machine-utils';
-import { FINAL, MachineFactory } from '../../';
-import { add, subtract, gt } from '../../mathOps';
+import { MachineFactory, getDataAndInvoke } from '../../machine-utils';
+import { FINAL } from '../../';
+import { add, gt, subtract } from '../../mathOps';
 import { Store } from '../../store';
-import { getEthAllocation, ethAllocationOutcome } from '../../calculations';
+import { ethAllocationOutcome, getEthAllocation } from '../../calculations';
 
-import { SupportState, Depositing } from '..';
+import { Depositing, SupportState } from '..';
 
 const PROTOCOL = 'direct-funding';
 const success = { type: FINAL };
@@ -89,10 +89,13 @@ export const machine: MachineFactory<Init, any> = (store: Store, context: Init) 
     const allocated = getEthAllocation(outcome, store.ethAssetHolderAddress)
       .map(i => i.amount)
       .reduce(add, '0');
+
     const holdings = await store.getHoldings(ctx.channelId);
 
-    if (gt(allocated, holdings)) throw new Error('Channel underfunded');
+    if (gt(allocated, holdings))
+      throw new Error('DirectFunding: Channel outcome is already underfunded; aborting');
   }
+
   function minimalOutcome(currentOutcome: Outcome, minimalEthAllocation: Allocation): Outcome {
     const allocation = getEthAllocation(currentOutcome, store.ethAssetHolderAddress);
 

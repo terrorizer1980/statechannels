@@ -5,10 +5,10 @@ import { AddressZero, HashZero } from 'ethers/constants';
 import { getChannelId } from '@statechannels/nitro-protocol';
 
 import {
+  ConcludeChannelEvent,
+  CreateChannelEvent,
   Init,
   machine,
-  CreateChannelEvent,
-  ConcludeChannelEvent,
 } from '../protocols/wallet/protocol';
 import { EphemeralStore, Store } from '../store';
 import { messageService } from '../messaging';
@@ -17,7 +17,7 @@ import { log } from '../utils';
 import { Chain } from '../chain';
 
 import { processStates } from './utils';
-import { first, second, wallet1, wallet2, participants, storeWithFundedChannel } from './data';
+import { first, participants, second, storeWithFundedChannel, wallet1, wallet2 } from './data';
 
 const EXPECTATION_TIMEOUT = process.env.CI ? 10000 : 500;
 jest.setTimeout(60000);
@@ -33,8 +33,13 @@ const createChannel: CreateChannelEvent = {
   challengeDuration: 1,
   participants,
   allocations: [
-    { destination: first.destination, amount: '3' },
-    { destination: second.destination, amount: '1' },
+    {
+      token: '0x',
+      allocationItems: [
+        { destination: first.destination, amount: '3' },
+        { destination: second.destination, amount: '1' },
+      ],
+    },
   ],
   appDefinition: AddressZero,
   appData: HashZero,

@@ -4,7 +4,7 @@ import {Interface} from 'ethers/utils';
 import {ContractArtifacts} from '@statechannels/nitro-protocol';
 
 export function getProvider(): Web3Provider {
-  return new Web3Provider(window.web3.currentProvider);
+  return new Web3Provider(window.ethereum);
 }
 
 export async function getEthAssetHolderContract() {
@@ -17,5 +17,8 @@ export async function getEthAssetHolderContract() {
 }
 
 export function getETHAssetHolderInterface(): Interface {
-  return new Interface(ContractArtifacts.EthAssetHolderArtifact['abi']);
+  return new Interface(
+    // @ts-ignore https://github.com/ethers-io/ethers.js/issues/602#issuecomment-574671078
+    ContractArtifacts.EthAssetHolderArtifact['abi']
+  );
 }

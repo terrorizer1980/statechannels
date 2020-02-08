@@ -1,8 +1,10 @@
-import { assign, DoneInvokeEvent, Machine } from 'xstate';
+import { DoneInvokeEvent, Machine, assign } from 'xstate';
 
-import { failure, MachineFactory, pretty, Store, success } from '../..';
+import { failure, Store, success } from '../..';
+import { MachineFactory, getDataAndInvoke } from '../../machine-utils';
+
 import { FundingStrategy, FundingStrategyProposed } from '../../wire-protocol';
-import { log } from '../../utils';
+import { getEthAllocation } from '../../calculations';
 
 import { LedgerFunding } from '..';
 
@@ -90,13 +92,21 @@ const fundVirtually = {
     onDone: 'success',
   },
 };
-const fundIndirectly = {
-  invoke: {
-    src: 'ledgerFunding',
-    data: ({ targetChannelId }: Init) => ({ targetChannelId }),
-    onDone: 'success',
-  },
+
+const getTargetAllocation = (store: Store) => async ({
+  targetChannelId,
+}: Init): Promise<LedgerFunding.Init> => {
+  const deductions = getEthAllocation(
+    await store.getEntry(targetChannelId).latestState.outcome,
+    store.ethAssetHolderAddress
+  );
+
+  return {
+    deductions,
+    targetChannelId,
+  };
 };
+const fundIndirectly = getDataAndInvoke(getTargetAllocation.name, 'ledgerFunding', 'success');
 
 export const config = {
   key: PROTOCOL,
@@ -127,6 +137,7 @@ export type Actions = {
 
 export type Services = {
   askClient(): Promise<FundingStrategy>;
+  getTargetAllocation(ctx: Init): Promise<LedgerFunding.Init>;
   directFunding: any;
   virtualFunding: any;
   ledgerFunding: any;
@@ -161,24 +172,7 @@ function strategyChoice({
     targetChannelId,
   };
 }
-const mockServices: Services = {
-  askClient: async () => 'Indirect',
-  directFunding: async () => true,
-  ledgerFunding: async () => true,
-  virtualFunding: async () => true,
-};
-const mockActions: Actions = {
-  sendClientChoice: (ctx: ClientChoiceKnown) => {
-    log(`Sending ${pretty(strategyChoice(ctx))}`);
-  },
-  assignClientChoice,
-};
-
-export const mockOptions: Options = {
-  guards,
-  services: mockServices,
-  actions: mockActions,
-};
+export const mockOptions: Partial<Options> = { guards };
 
 export const machine: MachineFactory<Init, any> = (store: Store, context: Init) => {
   function sendClientChoice(ctx: ClientChoiceKnown) {
@@ -190,6 +184,7 @@ export const machine: MachineFactory<Init, any> = (store: Store, context: Init) 
       askClient: async () => 'Indirect',
       directFunding: async () => true,
       ledgerFunding: LedgerFunding.machine(store),
+      getTargetAllocation: getTargetAllocation(store),
       virtualFunding: async () => true,
     },
     guards,

@@ -158,8 +158,8 @@ async function validTransition({
   Object.keys(toBalances).forEach(key =>
     toAllocation.push({destination: key, amount: toBalances[key].toString()})
   );
-  const fromOutcome = [{assetHolderAddress: AddressZero, allocation: fromAllocation}];
-  const toOutcome = [{assetHolderAddress: AddressZero, allocation: toAllocation}];
+  const fromOutcome = [{assetHolderAddress: AddressZero, allocationItems: fromAllocation}];
+  const toOutcome = [{assetHolderAddress: AddressZero, allocationItems: toAllocation}];
   const fromAppData: TTTData = {
     positionType: fromPositionType,
     stake: bigNumberify(fromStake).toString(),

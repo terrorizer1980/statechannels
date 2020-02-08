@@ -1,10 +1,11 @@
-import { assign, DoneInvokeEvent, Machine, MachineConfig, sendParent } from 'xstate';
-import { State, Channel } from '@statechannels/nitro-protocol';
+import { DoneInvokeEvent, Machine, MachineConfig, assign, sendParent } from 'xstate';
+import { Channel, State } from '@statechannels/nitro-protocol';
+import { CreateChannelParams, AllocationItem } from '@statechannels/client-api-schema';
 
-import { MachineFactory, success, Store } from '../..';
+import { Store, success } from '../..';
+import { MachineFactory } from '../../machine-utils';
 import { ethAllocationOutcome } from '../../calculations';
 import { ChannelStoreEntry } from '../../ChannelStoreEntry';
-import { JsonRpcCreateChannelParams } from '../../json-rpc';
 import { passChannelId } from '../join-channel/protocol';
 
 import { AdvanceChannel, Funding } from '..';
@@ -14,7 +15,7 @@ const PROTOCOL = 'create-channel';
 /*
 Spawned in a new process when the app calls CreateChannel
 */
-export type Init = JsonRpcCreateChannelParams & { chainId: string; challengeDuration: number };
+export type Init = CreateChannelParams & { chainId: string; challengeDuration: number };
 export type ChannelSet = Init & { channelId: string };
 export interface SetChannel {
   type: 'CHANNEL_INITIALIZED';
@@ -105,12 +106,20 @@ export const machine: MachineFactory<Init, any> = (store: Store, init: Init) => 
     };
 
     const { allocations, appData, appDefinition } = ctx;
+
+    let allocationItems: AllocationItem[] = [];
+    if (allocations.length === 1) {
+      allocationItems = allocations[0].allocationItems;
+    } else {
+      throw new Error('create-channel protocol only supports one asset holder');
+    }
+
     const firstState: State = {
       appData,
       appDefinition,
       isFinal: false,
       turnNum: 0,
-      outcome: ethAllocationOutcome(allocations, store.ethAssetHolderAddress),
+      outcome: ethAllocationOutcome(allocationItems, store.ethAssetHolderAddress),
       channel,
       challengeDuration: ctx.challengeDuration,
     };
@@ -121,6 +130,7 @@ export const machine: MachineFactory<Init, any> = (store: Store, init: Init) => 
       privateKey: store.getPrivateKey(participants),
       participants: ctx.participants,
     });
+
     store.initializeChannel(entry.args);
 
     const { channelId } = entry;

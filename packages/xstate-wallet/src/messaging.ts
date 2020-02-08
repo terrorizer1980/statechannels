@@ -1,4 +1,11 @@
 import {
+  UpdateChannelParams,
+  CloseChannelParams,
+  CreateChannelParams,
+  PushMessageParams,
+  JoinChannelParams
+} from '@statechannels/client-api-schema';
+import {
   getChannelId,
   Channel,
   Store,
@@ -7,21 +14,15 @@ import {
   AddressableMessage
 } from '@statechannels/wallet-protocols';
 import * as ethers from 'ethers';
+import {bigNumberify} from 'ethers/utils';
 import * as jrs from 'jsonrpc-lite';
-import {validateRequest} from './json-rpc-validation/validator';
 
-import {UpdateChannelParams} from '@statechannels/client-api-schema/types/update-channel';
+import {validateRequest} from './json-rpc-validation/validator';
 import {
   createStateFromUpdateChannelParams,
   createJsonRpcAllocationsFromOutcome
 } from './utils/json-rpc-utils';
-import {CloseChannelParams} from '@statechannels/client-api-schema/types/close-channel';
-import {bigNumberify} from 'ethers/utils';
-
-import {CreateChannelParams} from '@statechannels/client-api-schema/types/create-channel';
-import {PushMessageParams} from '@statechannels/client-api-schema/types/push-message';
 import {WorkflowManager} from './workflow-manager';
-import {JoinChannelParams} from '@statechannels/client-api-schema';
 
 export async function handleMessage(
   event,
@@ -149,7 +150,7 @@ async function handleCreateChannelMessage(
     const createChannel: CreateChannelEvent = {
       type: 'CREATE_CHANNEL',
       participants: params.participants,
-      allocations: params.allocations[0].allocationItems,
+      allocations: params.allocations,
       appDefinition: params.appDefinition,
       appData: params.appData,
       chainId: process.env.NETWORK_CHAIN_ID || '0',

@@ -21,7 +21,7 @@ export async function loadRPSApp(page: Page, ganacheAccountIndex: number): Promi
   );
   await page.evaluateOnNewDocument(`window.ethereum.networkVersion = 9001`);
   await page.evaluateOnNewDocument(`window.ethereum.on = () => {}`);
-  await page.goto('http://localhost:3000/', {waitUntil: 'networkidle0'});
+  await page.goto('http://localhost:3000/', {waitUntil: 'load'});
   page.on('pageerror', error => {
     throw error;
   });
@@ -32,25 +32,32 @@ export async function loadRPSApp(page: Page, ganacheAccountIndex: number): Promi
   });
 }
 
-/** */
-export async function waitForAndClickButton(page: Page | Frame, button: string): Promise<void> {
-  let retryAttempts = 0;
-  let error;
-  while (retryAttempts < 3) {
-    try {
-      return (await page.waitForXPath('//button[contains(., "' + button + '")]')).click();
-    } catch (e) {
-      error = e;
-      await new Promise(r => setTimeout(r, 250));
-      retryAttempts += 1;
-    }
+// waiting for a css selector, and then clicking that selector is more robust than waiting for
+// an XPath and then calling .click() on the resolved handle. We do not use the return value from the
+// waitForSelector promise, so we avoid any errors where that return value loses its meaning
+// https://github.com/puppeteer/puppeteer/issues/3496
+// https://github.com/puppeteer/puppeteer/issues/2977
+export async function waitForAndClickButton(
+  page: Page,
+  frame: Frame,
+  selector: string
+): Promise<void> {
+  try {
+    await frame.waitForSelector(selector);
+  } catch (error) {
+    console.error(
+      'frame.waitForSelector(' + selector + ') failed on frame ' + (await frame.title())
+    );
+    await page.screenshot({path: 'e2e-wait.error.png'});
+    throw error;
   }
-  console.error(`Could not click on ${button}`);
-  throw error;
-}
-
-export async function waitForHeading(page: Page | Frame): Promise<string | null> {
-  return (await page.waitFor('h1.mb-5.win-loss-title')).evaluate(el => el.textContent);
+  try {
+    return await frame.click(selector);
+  } catch (error) {
+    console.error('frame.click(' + selector + ') failed on frame ' + (await frame.title()));
+    await page.screenshot({path: 'e2e-click.error.png'});
+    throw error;
+  }
 }
 
 export async function setUpBrowser(headless: boolean, slowMo?: number): Promise<Browser> {

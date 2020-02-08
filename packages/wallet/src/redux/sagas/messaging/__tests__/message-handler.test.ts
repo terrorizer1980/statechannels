@@ -1,18 +1,26 @@
 import {convertAddressToBytes32} from "@statechannels/nitro-protocol";
+
+import {expectSaga} from "redux-saga-test-plan";
+
+import {Wallet} from "ethers";
+
+import * as matchers from "redux-saga-test-plan/matchers";
+
+import {AddressZero} from "ethers/constants";
+
 import {messageHandler} from "../message-handler";
 import * as walletStates from "../../../state";
 import {addressResponse} from "../outgoing-api-actions";
-import {expectSaga} from "redux-saga-test-plan";
-import {Wallet} from "ethers";
+
 import {messageSender} from "../message-sender";
-import * as matchers from "redux-saga-test-plan/matchers";
+
 import {getAddress} from "../../../selectors";
 import {asAddress, bsAddress, appState, asPrivateKey} from "../../../__tests__/state-helpers";
 import {getProvider} from "../../../../utils/contract-utils";
 import {setChannel} from "../../../channel-store";
 import {channelFromStates} from "../../../channel-store/channel-state/__tests__";
 import * as stateHelpers from "../../../__tests__/state-helpers";
-import {AddressZero} from "ethers/constants";
+
 import {strategyApproved} from "../../../../communication";
 
 describe("message listener", () => {
@@ -293,7 +301,7 @@ describe("message listener", () => {
           outcome: [
             {
               assetHolderAddress: AddressZero,
-              allocation: [
+              allocationItems: [
                 {destination: convertAddressToBytes32(destinationA), amount: "0x12"},
                 {destination: convertAddressToBytes32(destinationB), amount: "0x12"}
               ]
@@ -482,7 +490,7 @@ describe("message listener", () => {
         turnNum: 1,
         outcome: [
           {
-            allocation: allocations[0].allocationItems.map(a => {
+            allocationItems: allocations[0].allocationItems.map(a => {
               return {
                 amount: a.amount,
                 destination: convertAddressToBytes32(a.destination)

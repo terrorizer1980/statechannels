@@ -1,15 +1,14 @@
-import { Machine, MachineConfig, AnyEventObject, AssignAction, assign, spawn } from 'xstate';
+import { AnyEventObject, AssignAction, MachineConfig, assign, spawn } from 'xstate';
 import { State, getChannelId } from '@statechannels/nitro-protocol';
-import { map, filter } from 'rxjs/operators';
+import { filter, map } from 'rxjs/operators';
 
-import { MachineFactory, FINAL, statesEqual, outcomesEqual } from '../..';
+import { outcomesEqual, statesEqual } from '../..';
 import { Store, observeChannel } from '../../store';
+import { connectToStore } from '../../machine-utils';
 
 const PROTOCOL = 'support-state';
 
-export interface Init {
-  state: State;
-}
+export type Init = { state: State };
 
 /*
 TODO
@@ -31,7 +30,6 @@ export const config: MachineConfig<Init, any, AnyEventObject> = {
 
 type Services = { sendState(ctx: Init): any };
 
-type HasObserver = Init & { observer: any };
 type Options = {
   services: Services;
   actions: { spawnObserver: AssignAction<Init, any> };
@@ -79,7 +77,4 @@ const options = (store: Store): Options => ({
   },
 });
 
-export type machine = typeof machine;
-export const machine: MachineFactory<Init, any> = (store: Store, context: Init) => {
-  return Machine(config, options(store)).withContext(context);
-};
+export const machine = connectToStore(config, options);

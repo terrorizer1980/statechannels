@@ -1,10 +1,12 @@
-import { assign, Machine } from 'xstate';
-import { HashZero, AddressZero } from 'ethers/constants';
+import { Machine, assign } from 'xstate';
+import { AddressZero, HashZero } from 'ethers/constants';
+import { Outcome } from '@statechannels/nitro-protocol';
 
-import { Channel, FINAL, getChannelId, MachineFactory } from '../../';
+import { Channel, FINAL, getChannelId } from '../../';
 import { SignedState } from '../../types';
 import { ChannelStoreEntry } from '../../ChannelStoreEntry';
 import { Participant } from '../../store';
+import { MachineFactory } from '../../machine-utils';
 
 import { SupportState } from '..';
 
@@ -23,6 +25,7 @@ These differences allow create-null-channel to be fully-determined.
 
 export interface Init {
   channel: Channel;
+  outcome?: Outcome;
 }
 
 // For convenience, assign the channel id
@@ -41,11 +44,11 @@ const checkChannel = {
   },
 };
 
-function preFundData({ channel }: Context): SupportState.Init {
+function preFundData({ channel, outcome }: Context): SupportState.Init {
   return {
     state: {
       turnNum: 0,
-      outcome: [],
+      outcome: outcome || [],
       channel,
       isFinal: false,
       challengeDuration: 1,
@@ -54,6 +57,7 @@ function preFundData({ channel }: Context): SupportState.Init {
     },
   };
 }
+
 const preFundSetup = {
   invoke: {
     src: 'supportState',

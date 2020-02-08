@@ -20,7 +20,7 @@
       "properties": {
         "jsonrpc": {"enum": ["2.0"]},
         "method": {
-          "enum": ["MessageQueued", "ChannelProposed", "ChannelUpdated"]
+          "enum": ["MessageQueued", "ChannelProposed", "ChannelUpdated", "BudgetUpdated"]
         },
         "id": {
           "type": ["string", "number"]
@@ -32,7 +32,7 @@
           "if": {
             "properties": {
               "method": {
-                "const": "UIUpdate"
+                "enum": ["UIUpdate"]
               }
             }
           },
@@ -48,7 +48,7 @@
         },
         {
           "if": {
-            "properties": {"method": {"const": "MessageQueued"}}
+            "properties": {"method": {"enum": ["MessageQueued"]}}
           },
           "then": {
             "properties": {
@@ -58,7 +58,7 @@
         },
         {
           "if": {
-            "properties": {"method": {"const": "ChannelProposed"}}
+            "properties": {"method": {"enum": ["ChannelProposed"]}}
           },
           "then": {
             "params": {"$ref": "create-channel.json#/definitions/CreateChannelResult"}
@@ -66,10 +66,18 @@
         },
         {
           "if": {
-            "properties": {"method": {"const": "ChannelUpdated"}}
+            "properties": {"method": {"enum": ["ChannelUpdated"]}}
           },
           "then": {
             "params": {"$ref": "update-channel.json#/definitions/UpdateChannelParams"}
+          }
+        },
+        {
+          "if": {
+            "properties": {"method": {"enum": ["BudgetUpdated"]}}
+          },
+          "then": {
+            "params": {"$ref": "budget-result.json#/definitions/BudgetResult"}
           }
         }
       ]

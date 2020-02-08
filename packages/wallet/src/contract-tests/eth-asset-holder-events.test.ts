@@ -6,13 +6,14 @@ import {
   Transactions as nitroTrans
 } from "@statechannels/nitro-protocol";
 import SagaTester from "redux-saga-tester";
-import {DepositedEvent} from "../redux/actions";
-import {adjudicatorWatcher} from "../redux/sagas/adjudicator-watcher";
-import {assetHoldersWatcher} from "../redux/sagas/asset-holder-watcher";
-import {depositIntoETHAssetHolder, createWatcherState, concludeGame, fiveFive} from "./test-utils";
+
 import {getGanacheProvider} from "@statechannels/devtools";
 import {bigNumberify} from "ethers/utils";
 import {HashZero, AddressZero} from "ethers/constants";
+
+import {assetHoldersWatcher} from "../redux/sagas/asset-holder-watcher";
+import {adjudicatorWatcher} from "../redux/sagas/adjudicator-watcher";
+import {DepositedEvent} from "../redux/actions";
 import {
   getAdjudicatorInterface,
   getAdjudicatorContractAddress,
@@ -22,6 +23,8 @@ import {
 
 import {getAllocationOutcome} from "../utils/outcome-utils";
 import {convertBalanceToOutcome} from "../redux/__tests__/state-helpers";
+
+import {depositIntoETHAssetHolder, createWatcherState, concludeGame, fiveFive} from "./test-utils";
 jest.setTimeout(60000);
 
 describe("ETHAssetHolder listener", () => {
@@ -107,7 +110,7 @@ describe("ETHAssetHolder listener", () => {
       signer
     );
 
-    const allocation = getAllocationOutcome(outcome).allocation;
+    const allocation = getAllocationOutcome(outcome).allocationItems;
     const processId = ethers.Wallet.createRandom().address;
     const sagaTester = new SagaTester({initialState: createWatcherState(processId, channelId)});
     sagaTester.start(assetHoldersWatcher, provider);
@@ -173,5 +176,5 @@ async function transferAll(channelId: string, allocation: string, signer: Signer
   const assetHolderAddress = getETHAssetHolderAddress();
   const assetHolder = new Contract(assetHolderAddress, assetHolderInterface, signer);
 
-  assetHolder.functions.transferAll(channelId, allocation);
+  assetHolder.functions.transferAll(channelId, allocation, {gasLimit: 3e6});
 }

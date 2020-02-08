@@ -9,11 +9,8 @@
       "type": "object",
       "properties": {
         "allocations": {
-          "type": "array",
-          "items": {
-            "$ref": "definitions.json#/definitions/Allocation"
-          },
-          "title": "allocations"
+          "title": "allocations",
+          "$ref": "definitions.json#/definitions/TokenAllocations"
         },
         "appData": {
           "type": "string",

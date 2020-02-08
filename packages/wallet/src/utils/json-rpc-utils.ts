@@ -7,12 +7,14 @@ import {
   convertAddressToBytes32
 } from "@statechannels/nitro-protocol";
 import {bigNumberify, randomBytes} from "ethers/utils";
-import {NETWORK_ID, CHALLENGE_DURATION, ETH_ASSET_HOLDER_ADDRESS} from "../constants";
+
 import {
   UpdateChannelParams,
   Allocations,
   CreateChannelParams
 } from "@statechannels/client-api-schema";
+
+import {NETWORK_ID, CHALLENGE_DURATION, ETH_ASSET_HOLDER_ADDRESS} from "../constants";
 
 // TODO: Figure out how these should have been used
 // interface OpenChannel {
@@ -37,7 +39,7 @@ function createAllocationOutcomeFromParams(params: Allocations): Outcome {
     return {
       // TODO: Need to look up the the asset holder for the token
       assetHolderAddress: ETH_ASSET_HOLDER_ADDRESS,
-      allocation: p.allocationItems.map(a => {
+      allocationItems: p.allocationItems.map(a => {
         return {
           destination: convertAddressToBytes32(a.destination),
           amount: a.amount
@@ -54,7 +56,7 @@ export function createJsonRpcAllocationsFromOutcome(outcome: Outcome): Allocatio
     }
     return {
       token: o.assetHolderAddress,
-      allocationItems: o.allocation.map(a => ({
+      allocationItems: o.allocationItems.map(a => ({
         amount: a.amount,
         destination: convertBytes32ToAddress(a.destination)
       }))

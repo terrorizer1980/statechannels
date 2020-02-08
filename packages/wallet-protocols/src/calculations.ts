@@ -1,16 +1,15 @@
 import {
-  Outcome,
   Allocation,
-  AssetOutcome,
-  isAllocationOutcome,
   AllocationAssetOutcome,
-  GuaranteeAssetOutcome,
+  AssetOutcome,
   Guarantee,
+  GuaranteeAssetOutcome,
+  Outcome,
+  isAllocationOutcome,
 } from '@statechannels/nitro-protocol';
 import { hexZeroPad } from 'ethers/utils';
-import { AddressZero } from 'ethers/constants';
 
-import { add, subtract, gt } from './mathOps';
+import { add, gt, subtract } from './mathOps';
 
 import { checkThat } from '.';
 
@@ -20,14 +19,14 @@ export enum Errors {
 }
 
 export function allocateToTarget(
-  targetAllocation: Allocation,
   ledgerAllocation: Allocation,
+  deductions: Allocation,
   targetChannelId: string,
   ethAssetHolderAddress: string
 ): Outcome {
   let total = '0';
 
-  targetAllocation.forEach(targetItem => {
+  deductions.forEach(targetItem => {
     const ledgerIdx = ledgerAllocation.findIndex(
       ledgerItem => ledgerItem.destination === targetItem.destination
     );
@@ -62,7 +61,7 @@ export function getEthAllocation(outcome: Outcome, ethAssetHolderAddress: string
   const ethOutcome: AssetOutcome | undefined = outcome.find(
     o => o.assetHolderAddress === ethAssetHolderAddress
   );
-  return ethOutcome ? checkThat(ethOutcome, isAllocationOutcome).allocation : [];
+  return ethOutcome ? checkThat(ethOutcome, isAllocationOutcome).allocationItems : [];
 }
 
 export function ethAllocationOutcome(
@@ -75,8 +74,9 @@ export function ethAllocationOutcome(
   }
   return [
     {
+      // FIXME: Fix hard-coded asset holder address
       assetHolderAddress: ethAssetHolderAddress,
-      allocation: allocation.map(a => ({ ...a, destination: hexZeroPad(a.destination, 32) })),
+      allocationItems: allocation.map(a => ({ ...a, destination: hexZeroPad(a.destination, 32) })),
     },
   ];
 }
@@ -87,6 +87,7 @@ export function ethGuaranteeOutcome(
 ): GuaranteeAssetOutcome[] {
   return [
     {
+      // FIXME: Fix hard-coded asset holder address
       assetHolderAddress: ethAssetHolderAddress,
       guarantee,
     },

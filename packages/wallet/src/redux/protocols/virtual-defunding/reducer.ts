@@ -1,5 +1,5 @@
-import * as states from "./states";
-import {ProtocolStateWithSharedData, makeLocator, ProtocolReducer} from "..";
+import {Outcome, convertAddressToBytes32} from "@statechannels/nitro-protocol";
+
 import {SharedData} from "../../state";
 import {ProtocolLocator} from "../../../communication";
 import {ConsensusUpdateState, initializeConsensusUpdate} from "../consensus-update";
@@ -9,10 +9,9 @@ import {
 } from "../consensus-update/reducer";
 import {getChannelFundingState} from "../../selectors";
 import {getTwoPlayerIndex, getFundingChannelId, getLatestState} from "../reducer-helpers";
-import {VirtualDefundingAction} from "./actions";
+
 import {routesToConsensusUpdate} from "../consensus-update/actions";
 import {HUB_ADDRESS} from "../../../constants";
-import {Outcome, convertAddressToBytes32} from "@statechannels/nitro-protocol";
 import {
   getAllocationOutcome,
   getAllocationTotal,
@@ -20,6 +19,12 @@ import {
   getAllocationAmountForIndex
 } from "../../../utils/outcome-utils";
 import {TwoPartyPlayerIndex} from "../../types";
+
+import {VirtualDefundingAction} from "./actions";
+
+import * as states from "./states";
+
+import {ProtocolStateWithSharedData, makeLocator, ProtocolReducer} from "..";
 
 export function initialize({
   processId,
@@ -170,12 +175,14 @@ function waitForLedgerChannelUpdateReducer(
 
 function createJointChannelProposedOutcome(appOutcome: Outcome, hubAddress: string): Outcome {
   const allocationOutcome = getAllocationOutcome(appOutcome);
-  const newAllocation = [...allocationOutcome.allocation];
+  const newAllocation = [...allocationOutcome.allocationItems];
   newAllocation.push({
     destination: convertAddressToBytes32(hubAddress),
     amount: getAllocationTotal(appOutcome)
   });
-  return [{assetHolderAddress: allocationOutcome.assetHolderAddress, allocation: newAllocation}];
+  return [
+    {assetHolderAddress: allocationOutcome.assetHolderAddress, allocationItems: newAllocation}
+  ];
 }
 function createLedgerChannelProposedOutcome(
   appOutcome: Outcome,
@@ -192,5 +199,7 @@ function createLedgerChannelProposedOutcome(
       amount: theirAmount
     }
   ];
-  return [{assetHolderAddress: allocationOutcome.assetHolderAddress, allocation: newAllocation}];
+  return [
+    {assetHolderAddress: allocationOutcome.assetHolderAddress, allocationItems: newAllocation}
+  ];
 }

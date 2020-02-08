@@ -1,19 +1,19 @@
 import { EventEmitter } from 'events';
 
-import * as rxjs from 'rxjs';
-import { State, getStateSignerAddress, signState } from '@statechannels/nitro-protocol';
-import _ from 'lodash';
 import { AddressZero } from 'ethers/constants';
-import { hashState } from '@statechannels/nitro-protocol/lib/src/contract/state';
-import { map, filter } from 'rxjs/operators';
+import { filter, map } from 'rxjs/operators';
+import { State, getStateSignerAddress, hashState, signState } from '@statechannels/nitro-protocol';
+import * as rxjs from 'rxjs';
+import _ from 'lodash';
 
-import { ChannelStoreEntry, IChannelStoreEntry, Funding, supported } from './ChannelStoreEntry';
-import { messageService, IMessageService } from './messaging';
 import { AddressableMessage, FundingStrategyProposed } from './wire-protocol';
-import { Chain, IChain, ChainEventType, ChainEvent } from './chain';
+import { Chain, ChainEvent, ChainEventType, IChain } from './chain';
+import { ChannelStoreEntry, Funding, IChannelStoreEntry, supported } from './ChannelStoreEntry';
+import { IMessageService, messageService } from './messaging';
+
 import { add, gt } from './mathOps';
 
-import { getChannelId, SignedState, unreachable, statesEqual } from '.';
+import { SignedState, getChannelId, statesEqual, unreachable } from '.';
 
 export interface ChannelUpdated {
   type: 'CHANNEL_UPDATED';
@@ -186,7 +186,8 @@ export class EphemeralStore implements Store {
   public initializeChannel(data: IChannelStoreEntry) {
     const entry = new ChannelStoreEntry(data);
     if (this._store[entry.channelId]) {
-      throw new Error(`Channel ${JSON.stringify(entry.channel)} already initialized`);
+      console.warn(`Channel ${JSON.stringify(entry.channel)} already initialized`);
+      return;
     }
 
     const { participants, channelNonce } = entry.channel;

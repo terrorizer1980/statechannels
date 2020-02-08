@@ -1,8 +1,9 @@
-import {SharedData, ChannelFundingState, setFundingState} from "../../state";
-import * as states from "./states";
-import {ProtocolStateWithSharedData, makeLocator} from "..";
-import {ExistingLedgerFundingAction} from "./actions";
 import {bigNumberify} from "ethers/utils";
+
+import {AllocationAssetOutcome, Outcome, State} from "@statechannels/nitro-protocol";
+
+import {SharedData, ChannelFundingState, setFundingState} from "../../state";
+
 import {ProtocolLocator} from "../../../communication";
 import {
   initialize as initializeLedgerTopUp,
@@ -26,7 +27,7 @@ import {
   ConsensusUpdateState
 } from "../consensus-update/states";
 import {LedgerTopUpState} from "../ledger-top-up/states";
-import {Outcome, State} from "@statechannels/nitro-protocol";
+
 import {getLatestState} from "../reducer-helpers";
 import {
   getAllocationOutcome,
@@ -34,7 +35,12 @@ import {
   outcomeContainsId,
   getAllocationTotal
 } from "../../../utils/outcome-utils";
-import {AllocationAssetOutcome} from "@statechannels/nitro-protocol";
+
+import {ExistingLedgerFundingAction} from "./actions";
+import * as states from "./states";
+
+import {ProtocolStateWithSharedData, makeLocator} from "..";
+
 export {EXISTING_LEDGER_FUNDING_PROTOCOL_LOCATOR} from "../../../communication/protocol-locator";
 
 export const initialize = ({
@@ -241,7 +247,7 @@ function ledgerChannelNeedsTopUp(latestState: State, proposedOutcome: Outcome) {
   }
 
   const currentOutcome = latestState.outcome;
-  const proposedAllocation = getAllocationOutcome(proposedOutcome).allocation;
+  const proposedAllocation = getAllocationOutcome(proposedOutcome).allocationItems;
 
   return proposedAllocation.some(p => {
     if (!outcomeContainsId(currentOutcome, p.destination)) {
@@ -269,20 +275,23 @@ function craftAppFunding(
   // TODO: Currently assuming ETH, this should be updated to handle any asset
   const newAllocation: AllocationAssetOutcome = {
     assetHolderAddress: startingAllocation.assetHolderAddress,
-    allocation: []
+    allocationItems: []
   };
 
-  newAllocation.allocation.push({destination: appChannelId, amount: appTotal});
+  newAllocation.allocationItems.push({destination: appChannelId, amount: appTotal});
 
-  ledgerAllocation.allocation.forEach(a => {
-    const startingAllocationItem = startingAllocation.allocation.find(
+  ledgerAllocation.allocationItems.forEach(a => {
+    const startingAllocationItem = startingAllocation.allocationItems.find(
       s => s.destination === a.destination
     );
     const difference = !startingAllocationItem
       ? bigNumberify(0)
       : bigNumberify(a.amount).sub(startingAllocationItem.amount);
     if (difference.gt(0)) {
-      newAllocation.allocation.push({destination: a.destination, amount: difference.toHexString()});
+      newAllocation.allocationItems.push({
+        destination: a.destination,
+        amount: difference.toHexString()
+      });
     }
   });
 

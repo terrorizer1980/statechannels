@@ -1,13 +1,11 @@
 import { Machine } from 'xstate';
 
-import * as VirtualDefundingAsHub from '../virtual-defunding-as-hub/protocol';
-import * as VirtualDefundingAsLeaf from '../virtual-defunding-as-leaf/protocol';
-import { MachineFactory, FINAL, checkThat, statesEqual, outcomesEqual } from '../..';
+import { FINAL, checkThat, outcomesEqual } from '../..';
+import { MachineFactory, getDataAndInvoke } from '../../machine-utils';
 import { add } from '../../mathOps';
 import { Store } from '../../store';
-import { getDataAndInvoke } from '../../machine-utils';
 import { isIndirectFunding } from '../../ChannelStoreEntry';
-import { getEthAllocation, ethAllocationOutcome } from '../../calculations';
+import { ethAllocationOutcome, getEthAllocation } from '../../calculations';
 
 import { SupportState } from '..';
 
@@ -137,16 +135,3 @@ export const machine: MachineFactory<Init, any> = (store: Store, ctx: Init) => {
   const options = { services };
   return Machine(config).withConfig(options, ctx);
 };
-
-function virtualDefundingAsLeafArgs(ctx: Init): VirtualDefundingAsLeaf.Init {
-  const targetChannelId = 'target';
-  const index = 0;
-  return {
-    targetChannelId,
-    index,
-  };
-}
-function virtualDefundingAsHubArgs(ctx: Init): VirtualDefundingAsHub.Init {
-  const jointChannelId = 'joint';
-  return { jointChannelId };
-}

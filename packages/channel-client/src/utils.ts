@@ -1,6 +1,6 @@
 import {hashMessage} from 'ethers/utils';
 
-import {Participant} from './types';
+import {Participant} from '@statechannels/client-api-schema';
 
 /*
  This channel ID calculation revolves around `hashMessage` taking in a
