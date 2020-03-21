@@ -1,7 +1,6 @@
 'use strict';
 
 module.exports = function(environment) {
-  console.log(`TTT Address environment.js: ${process.env.TTT_CONTRACT_ADDRESS}`);
   let ENV = {
     modulePrefix: '@statechannels/tic-tac-toe',
     environment,
