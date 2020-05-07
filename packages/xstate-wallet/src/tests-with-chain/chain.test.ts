@@ -6,10 +6,7 @@ import {ETH_ASSET_HOLDER_ADDRESS} from '../config';
 import {Machine, interpret, Interpreter} from 'xstate';
 import {map} from 'rxjs/operators';
 import {Store} from '../store';
-
-const chain = new ChainWatcher();
-
-const store = new Store(chain);
+import {logger} from '../logger';
 
 const mockContext = {
   channelId: randomChannelId(),
@@ -24,6 +21,14 @@ type Init = {
 };
 
 const provider = new providers.JsonRpcProvider(`http://localhost:${process.env.GANACHE_PORT}`);
+const ethereum = {
+  enable: async () => ['0xfec44e15328B7d1d8885a8226b0858964358F1D6'],
+  sendAsync: async (...args) => logger.info({...args}, 'sendAsync'),
+  selectedAddress: '0xfec44e15328B7d1d8885a8226b0858964358F1D6',
+  provider
+};
+const chain = new ChainWatcher(ethereum);
+const store = new Store(chain);
 
 let ETHAssetHolder: Contract;
 let service: Interpreter<any, any, any, any>;
@@ -34,17 +39,13 @@ const subscribeDepositEvent = (ctx: Init) =>
     map((chainInfo: ChannelChainInfo) => {
       if (chainInfo.amount.gte(ctx.fundedAt)) {
         return 'FUNDED';
-      } else if (chainInfo.amount.gte(ctx.depositAt)) {
-        return 'SAFE_TO_DEPOSIT';
       } else {
-        return 'NOT_SAFE_TO_DEPOSIT';
+        throw 'Whoops';
       }
     })
   );
 
 const fundedEventSent = jest.fn();
-const safeToDepositEventSent = jest.fn();
-const notSafeToDepositEventSent = jest.fn();
 
 const mockMachine = Machine({
   initial: 'init',
@@ -55,16 +56,13 @@ const mockMachine = Machine({
         src: subscribeDepositEvent
       },
       on: {
-        FUNDED: {actions: fundedEventSent},
-        SAFE_TO_DEPOSIT: {actions: safeToDepositEventSent},
-        NOT_SAFE_TO_DEPOSIT: {actions: notSafeToDepositEventSent}
+        FUNDED: {actions: fundedEventSent}
       }
     }
   }
 });
 
 beforeAll(async () => {
-  (window as any).ethereum = {enable: () => ['0xfec44e15328B7d1d8885a8226b0858964358F1D6']};
   chain.ethereumEnable();
 
   const signer = await provider.getSigner('0x28bF45680cA598708E5cDACc1414FCAc04a3F1ed');

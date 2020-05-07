@@ -5,7 +5,7 @@ import {
   getChallengeRegisteredEvent,
   ChallengeRegisteredEvent
 } from '@statechannels/nitro-protocol';
-import {Contract} from 'ethers';
+import {Contract, providers} from 'ethers';
 import {Zero, One} from 'ethers/constants';
 import {Interface, BigNumber, bigNumberify, hexZeroPad, BigNumberish} from 'ethers/utils';
 import {Observable, fromEvent, from, merge} from 'rxjs';
@@ -14,10 +14,10 @@ import {filter, map, flatMap} from 'rxjs/operators';
 import EventEmitter = require('eventemitter3');
 
 import {fromNitroState, toNitroSignedState, calculateChannelId} from './store/state-utils';
-import {getProvider} from './utils/contract-utils';
 import {State, SignedState} from './store/types';
 import {ETH_ASSET_HOLDER_ADDRESS, NITRO_ADJUDICATOR_ADDRESS} from './config';
 import {logger} from './logger';
+import {Web3Provider} from 'ethers/providers';
 
 const EthAssetHolderInterface = new Interface(
   // https://github.com/ethers-io/ethers.js/issues/602#issuecomment-574671078
@@ -235,8 +235,16 @@ const chainLogger = logger.child({module: 'chain'});
 export class ChainWatcher implements Chain {
   private _adjudicator?: Contract;
   private _assetHolders: Contract[];
-  private mySelectedAddress: string | null;
-  private provider: ReturnType<typeof getProvider>;
+
+  public constructor(private readonly ethereum: any = undefined) {}
+
+  private get provider() {
+    return this.ethereum
+      ? new Web3Provider(this.ethereum)
+      : // eslint-disable-next-line no-process-env
+        new providers.JsonRpcProvider(`http://localhost:${process.env.GANACHE_PORT}`);
+  }
+
   private get signer() {
     if (!this.ethereumIsEnabled) throw new Error('Ethereum not enabled');
 
@@ -244,8 +252,6 @@ export class ChainWatcher implements Chain {
   }
 
   public async initialize() {
-    this.provider = getProvider();
-
     this.provider.on('block', blockNumber => chainLogger.info({blockNumber}, 'New Block'));
 
     this.configureContracts();
@@ -272,9 +278,10 @@ export class ChainWatcher implements Chain {
   }
 
   public async ethereumEnable(): Promise<string> {
-    if (window.ethereum) {
+    if (this.ethereum) {
       try {
-        this.mySelectedAddress = (await window.ethereum.enable())[0];
+        await this.ethereum.enable();
+
         if (this.ethereumIsEnabled) {
           this.configureContracts();
           return this.selectedAddress as string;
@@ -294,7 +301,7 @@ export class ChainWatcher implements Chain {
   }
 
   public get selectedAddress(): string | null {
-    return this.mySelectedAddress;
+    return this.ethereum.selectedAddress ?? null;
   }
 
   public get ethereumIsEnabled(): boolean {

@@ -14,7 +14,7 @@ import {CLEAR_STORAGE_ON_START, USE_INDEXED_DB, ADD_LOGS} from './config';
 const log = logger.info.bind(logger);
 
 (async function() {
-  const chain = new ChainWatcher();
+  const chain = new ChainWatcher(window.ethereum);
 
   const backend = USE_INDEXED_DB ? new Backend() : new MemoryBackend();
   const store = new Store(chain, backend);
