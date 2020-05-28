@@ -4,7 +4,7 @@ module.exports = {
   globalSetup: '<rootDir>/jest/test-setup.ts',
   rootDir: root,
   testMatch: ['<rootDir>/src/**/*.test.ts'],
-  testPathIgnorePatterns: ['<rootDir>/src/tests-with-chain'],
+  testPathIgnorePatterns: ['<rootDir>/src/**/?(*.)chain.test.ts?(x)'],
   testEnvironment: 'jsdom',
   preset: 'ts-jest',
   transform: {
@@ -15,6 +15,6 @@ module.exports = {
   globals: {
     GIT_VERSION: 'jest-GIT_VERSION',
     GIT_COMMIT_HASH: 'jest-GIT_COMMIT_HASH',
-    GIT_BRANCH: 'jest-GIT_BRANCH',
+    GIT_BRANCH: 'jest-GIT_BRANCH'
   }
 };

@@ -37,6 +37,28 @@
       "internalConsoleOptions": "neverOpen"
     },
     {
+      "name": "Jest Current With Chain",
+      "type": "node",
+      "request": "launch",
+      "args": [
+        "node_modules/.bin/jest",
+        "--config=${workspaceFolder}/config/jest/jest.with-chain.config.js",
+        "--runInBand",
+        "--env=jsdom",
+        "--watch",
+        "${relativeFile}"
+      ],
+      "skipFiles": ["<node_internals>/**/*.js", "node_modules"],
+      "cwd": "${workspaceRoot}/packages/xstate-wallet",
+      "protocol": "inspector",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "env": {
+        "SC_ENV": "circle-integration-w3t"
+      },
+      "timeout": 3000
+    },
+    {
       "type": "node",
       "request": "attach",
       "name": "Attach by Process ID",

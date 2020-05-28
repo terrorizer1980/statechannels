@@ -1,3 +1,4 @@
+/* eslint-disable no-process-env */
 import '../config/env';
 import {GanacheServer} from '@statechannels/devtools';
 import {deploy} from '../deployment/deploy';

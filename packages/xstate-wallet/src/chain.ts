@@ -437,7 +437,7 @@ export class ChainWatcher implements Chain {
   }
 
   public chainUpdatedFeed(channelId: string): Observable<ChannelChainInfo> {
-    return combineLatest(this.chainInfoFeed(channelId), this.challengeStateFeed(channelId)).pipe(
+    return combineLatest(this.chainInfoFeed(channelId), this.challengeInfoFeed(channelId)).pipe(
       map(([chainInfo, challengeInfo]) => ({
         ...chainInfo,
         challengeState: chainInfo.finalizesAt.gt(Zero) ? challengeInfo.challengeState : undefined,
@@ -475,7 +475,7 @@ export class ChainWatcher implements Chain {
     return merge(first, depositEvents, assetTransferEvents);
   }
 
-  private challengeStateFeed(channelId: string): Observable<ChallengeEventInfo> {
+  private challengeInfoFeed(channelId: string): Observable<ChallengeEventInfo> {
     if (!this._adjudicator) {
       throw new Error('Not connected to contracts');
     }
@@ -543,7 +543,7 @@ export class ChainWatcher implements Chain {
       }))
     );
 
-    // Fires when a block is mined
+    // Gets the current block and fires when a new block is mined
     const blockMined = merge(
       from(this.provider.getBlock(this.provider.blockNumber)),
       fromEvent(this.provider, 'block').pipe(
@@ -553,13 +553,15 @@ export class ChainWatcher implements Chain {
 
     const challengeEventFeed = merge(first, challengeRegisteredUpdates, challengeClearedUpdates);
     return combineLatest(challengeEventFeed, blockMined).pipe(
-      map(([c, b]) => ({
-        ...c,
-        finalized: BigNumber.from(b.timestamp).gte(c.finalizesAt),
-        blockNum: BigNumber.from(b.timestamp).gte(c.finalizesAt)
-          ? BigNumber.from(b.number)
-          : c.blockNum // Only update the blockNum if the challenge is cleared meaning the challengeEventInfo is updated
-      })),
+      map(([c, b]) => {
+        return {
+          ...c,
+          finalized: BigNumber.from(b.timestamp).gte(c.finalizesAt),
+          blockNum: BigNumber.from(b.timestamp).gte(c.finalizesAt)
+            ? BigNumber.from(b.number)
+            : c.blockNum // Only update the blockNum if the challenge is cleared meaning the challengeEventInfo is updated
+        };
+      }),
       distinctUntilChanged((c1, c2) => {
         return c1.blockNum.eq(c2.blockNum);
       })

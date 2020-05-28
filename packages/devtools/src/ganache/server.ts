@@ -19,7 +19,7 @@ export class GanacheServer {
     public readonly port: number = 8545,
     public readonly chainId: number = 9001,
     accounts: Account[] = ETHERLIME_ACCOUNTS,
-    public readonly timeout: number = 5000,
+    public readonly timeout: number = 50000,
     gasLimit = 1000000000,
     gasPrice = 1
   ) {
@@ -29,7 +29,7 @@ export class GanacheServer {
     this.fundedPrivateKey = accounts[0].privateKey;
 
     const oneMillion = ethers.utils.parseEther('1000000');
-
+    console.log(process.cwd());
     const opts = [
       [`--networkId ${this.chainId}`, `--port ${this.port}`],
       accounts.map(a => `--account ${a.privateKey},${a.amount || oneMillion}`),
@@ -39,7 +39,7 @@ export class GanacheServer {
       .reduce((a, b) => a.concat(b))
       .join(' ');
 
-    const cmd = `ganache-cli ${opts}`;
+    const cmd = `npx ganache-cli ${opts}`;
 
     this.server = spawn('npx', ['-c', cmd], {stdio: 'pipe'});
     if (showOutput) {
@@ -48,8 +48,9 @@ export class GanacheServer {
       });
     }
     this.server.stderr.on('data', data => {
-      log.error(`Server threw error ${data.toString()}`);
-      throw new Error('Ganache server failed to start');
+      console.log(data);
+      // log.error(`Server threw error ${data.toString()}`);
+      // throw new Error('Ganache server failed to start');
     });
 
     this.provider = new JsonRpcProvider(`http://localhost:${this.port}`);

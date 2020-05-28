@@ -71,17 +71,17 @@ const noChallengeOnchain: Guard<Initial, ChainEvent> = {
 //   predicate: (context, event) => false // TODO: Add challenge state to context
 // };
 
-const challengeOnchainAsExpected: Guard<Initial, ChainEvent> = {
-  type: 'xstate.guard',
-  name: 'challengeOnchainAsExpected',
-  predicate: (context, {finalizesAt, finalized}) => finalizesAt.gt(0) && !finalized
-};
+// const challengeOnchainAsExpected: Guard<Initial, ChainEvent> = {
+//   type: 'xstate.guard',
+//   name: 'challengeOnchainAsExpected',
+//   predicate: (context, {finalizesAt, finalized}) => finalizesAt.gt(0) && !finalized
+// };
 
-const challengeFinalized: Guard<Initial, ChainEvent> = {
-  type: 'xstate.guard',
-  name: 'challengeFinalized',
-  predicate: (context, {finalized}) => finalized
-};
+// const challengeFinalized: Guard<Initial, ChainEvent> = {
+//   type: 'xstate.guard',
+//   name: 'challengeFinalized',
+//   predicate: (context, {finalized}) => finalized
+// };
 
 const submitChallengeTransaction = (store: Store) => async ({channelId}: Initial) => {
   const {support, myAddress} = await store.getEntry(channelId);
@@ -114,16 +114,8 @@ export const machine = (
 
     on: {
       CHANNEL_UPDATED: {actions: log('CHANNEL_UPDATED sent to challenge channel machine')},
-      CHAIN_EVENT: [
-        {
-          target: 'waitForResponseOrTimeout',
-          cond: challengeOnchainAsExpected
-        },
-        {
-          target: 'done',
-          cond: challengeFinalized
-        }
-      ]
+      CHANNEL_RAISED: {target: 'done'},
+      CHALLENGE_CLEARED: {actions: log('CHANNEL_CLEARED sent to challenge channel machine')}
     },
 
     states: {

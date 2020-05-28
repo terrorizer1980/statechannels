@@ -260,8 +260,9 @@ export const workflow = (
           r.channelId === channelId
       )
     );
-  const notifyOnChallenge = ({channelId}: ChannelIdExists) =>
-    store.chain
+  const notifyOnChallenge = ({channelId}: ChannelIdExists) => {
+    store.chain.chainUpdatedFeed(channelId).subscribe(console.log);
+    return store.chain
       .chainUpdatedFeed(channelId)
       .pipe(
         map(c =>
@@ -270,6 +271,7 @@ export const workflow = (
             : {type: 'CHALLENGE_CLEARED'}
         )
       );
+  };
 
   const notifyOnUpdate = ({channelId}: ChannelIdExists) =>
     store.channelUpdatedFeed(channelId).pipe(
