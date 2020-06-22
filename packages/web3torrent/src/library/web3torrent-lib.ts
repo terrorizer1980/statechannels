@@ -375,6 +375,17 @@ export default class WebTorrentPaidStreamingClient extends WebTorrent {
           this.refillBuffer(torrent.infoHash, channelState.channelId);
           this.unblockPeer(torrent.infoHash, wire);
         }
+
+        if (
+          // If the amount I have downloaded is catching up to the balance of the uploader
+          !this.paymentChannelClient.amProposer &&
+          bigNumberify(channelState.beneficiary.balance)
+            .div(WEI_PER_BYTE)
+            .toNumber() <
+            wire.downloaded - BLOCK_LENGTH
+        ) {
+          this.makePayment(torrent as PaidStreamingTorrent, wire);
+        }
         this.emitTorrentUpdated(torrent.infoHash, 'onChannelUpdated');
       }
     });
