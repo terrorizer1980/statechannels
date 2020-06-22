@@ -378,13 +378,15 @@ export default class WebTorrentPaidStreamingClient extends WebTorrent {
 
         if (
           // If the amount I have downloaded is catching up to the balance of the uploader
-          !this.paymentChannelClient.amProposer &&
-          bigNumberify(channelState.beneficiary.balance)
-            .div(WEI_PER_BYTE)
-            .toNumber() <
-            wire.downloaded - BLOCK_LENGTH
+          !this.paymentChannelClient.amProposer(channelState) &&
+          this.paymentChannelClient.canUpdateChannel(channelState)
+          // bigNumberify(channelState.beneficiary.balance)
+          //   .div(WEI_PER_BYTE)
+          //   .toNumber() <
+          //   wire.downloaded + BLOCK_LENGTH
         ) {
-          this.makePayment(torrent as PaidStreamingTorrent, wire);
+          await this.makePayment(torrent as PaidStreamingTorrent, wire);
+          console.info('Made OPTIMISTIC payment');
         }
         this.emitTorrentUpdated(torrent.infoHash, 'onChannelUpdated');
       }
@@ -572,7 +574,9 @@ export default class WebTorrentPaidStreamingClient extends WebTorrent {
       tailBytes = torrent.store.store.lastChunkLength;
     }
 
-    const amountToPay = WEI_PER_BYTE.mul(BLOCK_LENGTH * numBlocksToPayFor + tailBytes);
+    const amountToPay = WEI_PER_BYTE.mul(BLOCK_LENGTH * numBlocksToPayFor + tailBytes).mul(
+      this.paymentChannelClient.channelCache[leechingChannelId]?.turnNum.eq(5) ? 10 : 1
+    ); // TODO
     log.debug(`<< STOP ${peerAccount} - About to pay ${amountToPay.toString()}`);
     await this.paymentChannelClient.makePayment(leechingChannelId, amountToPay.toString());
 

@@ -352,7 +352,7 @@ export class PaymentChannelClient {
    * - the channel is still 'running'
    * - it's my turn to move
    */
-  private canUpdateChannel(state: ChannelState): boolean {
+  canUpdateChannel(state: ChannelState): boolean {
     return state.status === 'running' && this.isMyTurn(state);
   }
 
