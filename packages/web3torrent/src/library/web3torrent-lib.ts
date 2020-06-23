@@ -385,6 +385,7 @@ export default class WebTorrentPaidStreamingClient extends WebTorrent {
           //   .toNumber() <
           //   wire.downloaded + BLOCK_LENGTH
         ) {
+          console.info('Making OPTIMISTIC payment... ');
           await this.makePayment(torrent as PaidStreamingTorrent, wire);
           console.info('Made OPTIMISTIC payment');
         }
@@ -475,7 +476,7 @@ export default class WebTorrentPaidStreamingClient extends WebTorrent {
     torrent.on(TorrentEvents.NOTICE, async (wire, {command, data}) => {
       switch (command) {
         case PaidStreamingExtensionNotices.STOP: // payment and "stop asking for data" request
-          await this.makePayment(torrent, wire);
+          // await this.makePayment(torrent, wire);
           break;
         case PaidStreamingExtensionNotices.START: // "okay, now you can continue asking for data" request
           this.jumpStart(torrent, wire);
@@ -574,9 +575,11 @@ export default class WebTorrentPaidStreamingClient extends WebTorrent {
       tailBytes = torrent.store.store.lastChunkLength;
     }
 
-    const amountToPay = WEI_PER_BYTE.mul(BLOCK_LENGTH * numBlocksToPayFor + tailBytes).mul(
-      this.paymentChannelClient.channelCache[leechingChannelId]?.turnNum.eq(5) ? 10 : 1
-    ); // TODO
+    let amountToPay = WEI_PER_BYTE.mul(BLOCK_LENGTH * numBlocksToPayFor + tailBytes);
+    if (this.paymentChannelClient.channelCache[leechingChannelId]?.turnNum.eq(4)) {
+      // first payment
+      amountToPay = WEI_PER_BYTE.mul(BLOCK_LENGTH * numBlocksToPayFor + tailBytes).mul(10);
+    }
     log.debug(`<< STOP ${peerAccount} - About to pay ${amountToPay.toString()}`);
     await this.paymentChannelClient.makePayment(leechingChannelId, amountToPay.toString());
 
