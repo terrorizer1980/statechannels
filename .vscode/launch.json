@@ -34,7 +34,28 @@
       "internalConsoleOptions": "neverOpen",
       "disableOptimisticBPs": true,
       "windows": {
-        "program": "${workspaceFolder}/node_modules/jest/bin/jest",
+        "program": "${workspaceFolder}/node_modules/jest/bin/jest"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      // this is the best way I can find to work with a monorepo in vscode ...
+      "name": "[xstate-wallet] jest current with chain",
+      "program": "${workspaceFolder}/node_modules/.bin/jest",
+      "args": [
+        "${relativeFile}",
+        "--runInBand",
+        "--config",
+        // ... because we need some way of locating this jest config
+        "${workspaceFolder}/packages/xstate-wallet/config/jest/jest.with-chain.config.js"
+      ],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "disableOptimisticBPs": true,
+      "cwd": "${workspaceFolder}/packages/xstate-wallet",
+      "windows": {
+        "program": "${workspaceFolder}/node_modules/jest/bin/jest"
       }
     }
   ]

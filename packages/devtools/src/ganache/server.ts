@@ -147,7 +147,8 @@ export class GanacheServer {
       .reduce((a, b) => a.concat(b))
       .join(' ');
 
-    const cmd = `ganache-cli ${opts}`;
+    // TODO `npx npx ganache-cli` seems to work for debugging
+    const cmd = `npx ganache-cli ${opts}`;
 
     this.server = spawn('npx', ['-c', cmd], {stdio: 'pipe'});
     this.server.stdout.on('data', data => {
