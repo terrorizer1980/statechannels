@@ -108,7 +108,10 @@ export default class WebTorrentPaidStreamingClient extends WebTorrent {
       torrent = super.seed(input, options, optionsOrCallback) as PaidStreamingTorrent;
     } else {
       options = {...options, ...optionsOrCallback};
-      torrent = super.seed(input, options, callback) as PaidStreamingTorrent;
+      torrent = {
+        ...(super.seed(input, options, callback) as PaidStreamingTorrent),
+        pieceLength: BLOCK_LENGTH
+      };
     }
     this.setupTorrent(torrent);
 

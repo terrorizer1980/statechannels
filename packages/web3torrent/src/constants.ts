@@ -7,7 +7,7 @@ export const VERSION = process.env.VERSION;
 export const COMMIT_HASH = process.env.COMMIT_HASH;
 
 export const WEI_PER_BYTE = utils.bigNumberify(1); // cost per byte
-export const BLOCK_LENGTH = 1 << 14; // Standard request length.
+export const BLOCK_LENGTH = 1 << 10; // Standard request length.
 export const PEER_TRUST = 5; //amount of trust between peers. It's equivalent to the amount of request to pre-pay.
 // The recomended value is 5 ( the size of the queue of requests made by the leecher to the seeder)
 
