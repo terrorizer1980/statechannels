@@ -114,7 +114,7 @@ export abstract class PaidStreamingExtension implements Extension {
   }
 
   stop() {
-    this.isForceChoking = true;
+    // this.isForceChoking = true;
     this.executeExtensionCommand(PaidStreamingExtensionNotices.STOP, this.seedingChannelId);
   }
 
