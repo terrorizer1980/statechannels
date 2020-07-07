@@ -21,7 +21,7 @@ type ChannelEntry<
 
 type SupportedType = 'prefund' | 'postfund' | 'running' | 'closing' | 'closed';
 
-type ChannelState2 = {
+export type ChannelState2 = {
   channelId: string;
   purpose: 'app' | 'joint' | 'guarantor' | 'ledger';
   myIndex;

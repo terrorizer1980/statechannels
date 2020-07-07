@@ -14,10 +14,10 @@ type AdjudicatorState = {
   state?: State;
 };
 
-type AssetHolderState = {type: 'AssetHolderState'; amount: string} & (
-  | {isFinalized: true; finalizedOutcome?: Outcome}
-  | {isFinalized: false}
-);
+type AssetHolderState = {type: 'AssetHolderState'; amount: string} & {
+  isFinalized: boolean;
+  finalizedOutcome?: Outcome;
+};
 
 type SupportedState = {stage: Stage; outcome};
 type LatestState = {stage: 'supported'} | SupportedState;
@@ -156,10 +156,10 @@ const finalizedOnChain: MachineConfig<ProtocolState, FinalizedStateSchema, Event
   states: {defund: {type: 'final'}}
 };
 
-const notInChannel = (_ctx: ProtocolState) => true;
+const noDeposit = (ctx: ProtocolState) => ctx.assetHolderState.amount === '0';
 const challengeOngoing: MachineConfig<ProtocolState, ChallengeOngoingStateSchema, Event> = {
   initial: 'checkFunding',
-  states: {checkFunding: autoTransition(['abort', notInChannel], 'monitor')}
+  states: {checkFunding: autoTransition(['abort', noDeposit], 'monitor')}
 };
 
 const fullyFunded = () => true;
