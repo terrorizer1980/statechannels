@@ -12,9 +12,14 @@ type AdjudicatorState = {
   channelStatus: AdjudicatorStatus;
   turnNumRecord: number;
   state?: State;
+  pendingTransaction: string | undefined;
 };
 
-type AssetHolderState = {type: 'AssetHolderState'; amount: string} & {
+type AssetHolderState = {
+  type: 'AssetHolderState';
+  amount: string;
+  pendingTransaction: string | undefined;
+} & {
   isFinalized: boolean;
   finalizedOutcome?: Outcome;
 };
@@ -146,7 +151,7 @@ type MachineStateSchema = {
   };
 };
 
-type Event = {type: 'xstate.init'};
+type Event = {type: string};
 
 const adjudicatorGuard = (s: AdjudicatorStatus) => (c: ProtocolState) =>
   c.adjudicatorState.channelStatus === s;
@@ -190,3 +195,51 @@ export const machine = Machine<ProtocolState, MachineStateSchema, Event>({
     channelOpen
   }
 });
+
+type WorkflowFunction = any;
+
+export const act2: WorkflowFunction = (x: any) => {
+  switch (x.adjudicatorGuard()) {
+    case 'finalizedOnChain':
+      return actWhenFinalizedOnChain(x);
+    case 'challengeOngoing':
+      return actWhenChallengeOngoing(x);
+    case 'channelOpen':
+      return actWhenChannelOpen(x);
+  }
+};
+
+type ActionFunction = Function;
+export const partitionAndAct = <T extends string>(
+  partitionFunction: (x: any) => T,
+  actionLookup: Record<T, ActionFunction>
+) => (x: any) => actionLookup[partitionFunction(x)](x);
+
+const actWhenFinalizedOnChain = x => {};
+const actWhenChallengeOngoing = x => {};
+const actWhenChannelOpen = x => {};
+
+const adjudicatorChannelStatus = (c: ProtocolState) => c.adjudicatorState.channelStatus;
+
+const partitionOnAdjudicatorStatus = partitionAndAct<AdjudicatorStatus>(adjudicatorChannelStatus, {
+  finalized: actWhenFinalizedOnChain,
+  challenge: actWhenChallengeOngoing,
+  open: actWhenChannelOpen
+});
+
+const initial = 'start';
+export const topMachine = {
+  initial,
+  states: {
+    start: {
+      on: {
+        FINALIZED: 'finalizedOnChain',
+        CHALLENGE_ONGOING: 'challengeOngoing',
+        OPEN: 'channelOpen'
+      }
+    },
+    finalizedOnChain,
+    challengeOngoing,
+    channelOpen
+  }
+};
