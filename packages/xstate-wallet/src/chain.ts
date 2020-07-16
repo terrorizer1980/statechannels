@@ -20,7 +20,9 @@ import {
   SignedState,
   fromNitroState,
   toNitroSignedState,
-  calculateChannelId
+  calculateChannelId,
+  Uint256,
+  BN
 } from '@statechannels/wallet-core';
 
 import {getProvider} from './utils/contract-utils';
@@ -28,7 +30,7 @@ import {ETH_ASSET_HOLDER_ADDRESS, NITRO_ADJUDICATOR_ADDRESS} from './config';
 import {logger} from './logger';
 
 export interface ChannelChainInfo {
-  readonly amount: BigNumber;
+  readonly amount: Uint256;
   readonly channelStorage: {
     turnNumRecord: number;
     finalizesAt: number;
@@ -138,7 +140,7 @@ export class FakeChain implements Chain {
 
     this.channelStatus[channelId] = {
       ...this.channelStatus[channelId],
-      amount: Zero,
+      amount: BN.from(0),
       blockNum: this.blockNumber
     };
 
@@ -163,10 +165,10 @@ export class FakeChain implements Chain {
   public depositSync(channelId: string, expectedHeld: string, amount: string) {
     const current = (this.channelStatus[channelId] || {}).amount || Zero;
 
-    if (current.gte(expectedHeld)) {
+    if (BN.gte(current, expectedHeld)) {
       this.channelStatus[channelId] = {
         ...this.channelStatus[channelId],
-        amount: current.add(amount)
+        amount: BN.add(current, amount)
       };
       this.eventEmitter.emit('updated', {
         ...this.channelStatus[channelId],
@@ -187,7 +189,7 @@ export class FakeChain implements Chain {
         channelStorage.finalizesAt > 0 &&
         channelStorage.finalizesAt <= this.blockNumber,
       blockNum: this.blockNumber,
-      amount: amount || Zero
+      amount: amount || BN.from(0)
     };
   }
 
@@ -400,7 +402,7 @@ export class ChainWatcher implements Chain {
     }
     const ethAssetHolder = this._assetHolders[0];
 
-    const amount: BigNumber = await ethAssetHolder.holdings(channelId);
+    const amount: Uint256 = BN.from(await ethAssetHolder.holdings(channelId));
 
     const result = await this._adjudicator.getChannelStorage(channelId);
 

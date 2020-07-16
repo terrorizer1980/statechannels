@@ -20,7 +20,9 @@ import {
   State,
   StateVariables,
   SimpleAllocation,
-  Funding
+  Funding,
+  Uint256,
+  BN
 } from '@statechannels/wallet-core';
 
 import {Chain, FakeChain} from '../chain';
@@ -479,7 +481,7 @@ export class Store {
   public reserveFunds = (
     assetHolderAddress: string,
     channelId: string,
-    amount: {send: BigNumber; receive: BigNumber}
+    amount: {send: Uint256; receive: Uint256}
   ) =>
     this.backend.transaction(
       'readwrite',
@@ -497,19 +499,19 @@ export class Store {
         if (!assetBudget) throw Error(Errors.noAssetBudget);
 
         if (
-          assetBudget.availableSendCapacity.lt(amount.send) ||
-          assetBudget.availableReceiveCapacity.lt(amount.receive)
+          BN.lt(assetBudget.availableSendCapacity, amount.send) ||
+          BN.lt(assetBudget.availableReceiveCapacity, amount.receive)
         ) {
           throw Error(Errors.budgetInsufficient);
         }
 
         currentBudget.forAsset[assetHolderAddress] = {
           ...assetBudget,
-          availableSendCapacity: assetBudget.availableSendCapacity.sub(amount.send),
-          availableReceiveCapacity: assetBudget.availableReceiveCapacity.sub(amount.receive),
+          availableSendCapacity: BN.sub(assetBudget.availableSendCapacity, amount.send),
+          availableReceiveCapacity: BN.sub(assetBudget.availableReceiveCapacity, amount.receive),
           channels: {
             ...assetBudget.channels,
-            [channelId]: {amount: amount.send.add(amount.receive)}
+            [channelId]: {amount: BN.add(amount.send, amount.receive)}
           }
         };
         this.backend.setBudget(currentBudget.domain, currentBudget);

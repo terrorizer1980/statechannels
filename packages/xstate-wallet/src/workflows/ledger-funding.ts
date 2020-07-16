@@ -3,9 +3,9 @@ import {
   allocateToTarget,
   isSimpleEthAllocation,
   checkThat,
-  add,
   AllocationItem,
-  Funding
+  Funding,
+  BN
 } from '@statechannels/wallet-core';
 
 import {ChannelLock} from '../store/store';
@@ -90,12 +90,12 @@ const getTargetOutcome = (store: Store) => async (ctx: Init): Promise<SupportSta
 
   const currentlyAllocated = checkThat(ledgerState.outcome, isSimpleEthAllocation)
     .allocationItems.map(i => i.amount)
-    .reduce(add);
-  const toDeduct = deductions.map(i => i.amount).reduce(add);
+    .reduce(BN.add);
+  const toDeduct = deductions.map(i => i.amount).reduce(BN.add);
 
-  if (amount.lt(currentlyAllocated)) throw new Error(Errors.underfunded);
+  if (BN.lt(amount, currentlyAllocated)) throw new Error(Errors.underfunded);
 
-  if (currentlyAllocated.lt(toDeduct)) throw new Error(Errors.underallocated);
+  if (BN.lt(currentlyAllocated, toDeduct)) throw new Error(Errors.underallocated);
 
   return {
     state: {

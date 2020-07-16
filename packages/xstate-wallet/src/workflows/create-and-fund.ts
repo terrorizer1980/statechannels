@@ -13,13 +13,12 @@ import {
   isVirtuallyFund,
   StateVariables,
   Outcome,
-  add,
   isSimpleEthAllocation,
   simpleEthAllocation,
-  checkThat
+  checkThat,
+  BN
 } from '@statechannels/wallet-core';
 
-import {Zero} from '@ethersproject/constants';
 import {Store} from '../store';
 
 import {SupportState, VirtualFundingAsLeaf, Depositing} from '.';
@@ -71,7 +70,7 @@ const triggerObjective = (store: Store) => async (ctx: Init): Promise<void> => {
 
   const outcome: Outcome = simpleEthAllocation([
     allocationItems[0],
-    {destination: HUB.destination, amount: allocationItems.map(i => i.amount).reduce(add)},
+    {destination: HUB.destination, amount: allocationItems.map(i => i.amount).reduce(BN.add)},
     allocationItems[1]
   ]);
 
@@ -105,8 +104,9 @@ const reserveFunds = (
   const playerDestination =
     channelEntry.supported.participants.find(p => p.signingAddress === playerAddress)
       ?.destination || '0x0';
-  const receive = allocationItems.find(a => a.destination !== playerDestination)?.amount || Zero;
-  const send = allocationItems.find(a => a.destination === playerDestination)?.amount || Zero;
+  const receive =
+    allocationItems.find(a => a.destination !== playerDestination)?.amount || BN.from(0);
+  const send = allocationItems.find(a => a.destination === playerDestination)?.amount || BN.from(0);
 
   const budget = await store.reserveFunds(ETH_ASSET_HOLDER_ADDRESS, context.channelId, {
     receive,
@@ -231,13 +231,13 @@ const getDepositingInfo = (store: Store) => async ({channelId}: Init): Promise<D
   const {supported: supportedState, myIndex} = await store.getEntry(channelId);
   const {allocationItems} = checkThat(supportedState.outcome, isSimpleEthAllocation);
 
-  const fundedAt = allocationItems.map(a => a.amount).reduce(add);
-  let depositAt = Zero;
+  const fundedAt = allocationItems.map(a => a.amount).reduce(BN.add);
+  let depositAt = BN.from(0);
   for (let i = 0; i < allocationItems.length; i++) {
     const {amount} = allocationItems[i];
-    if (i !== myIndex) depositAt = depositAt.add(amount);
+    if (i !== myIndex) depositAt = BN.add(depositAt, amount);
     else {
-      const totalAfterDeposit = depositAt.add(amount);
+      const totalAfterDeposit = BN.add(depositAt, amount);
       return {channelId, depositAt, totalAfterDeposit, fundedAt};
     }
   }

@@ -4,12 +4,11 @@ import {
   simpleEthAllocation,
   State,
   SignedState,
-  createSignatureEntry
+  createSignatureEntry,
+  BN
 } from '@statechannels/wallet-core';
 
 import {AddressZero} from '@ethersproject/constants';
-import {hexZeroPad} from '@ethersproject/bytes';
-import {BigNumber} from 'ethers';
 
 import {FakeChain} from '../chain';
 import {Backend} from '../store/dexie-backend';
@@ -35,14 +34,8 @@ test('concludes on their turn', async () => {
     new Backend()
   );
   const outcome = simpleEthAllocation([
-    {
-      destination: playerA.destination,
-      amount: BigNumber.from(hexZeroPad('0x06f05b59d3b20000', 32))
-    },
-    {
-      destination: playerA.destination,
-      amount: BigNumber.from(hexZeroPad('0x06f05b59d3b20000', 32))
-    }
+    {destination: playerA.destination, amount: BN.from('0x06f05b59d3b20000')},
+    {destination: playerA.destination, amount: BN.from('0x06f05b59d3b20000')}
   ]);
 
   hookUpMessaging(playerA, playerB);

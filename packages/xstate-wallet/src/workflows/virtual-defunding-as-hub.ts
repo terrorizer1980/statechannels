@@ -2,10 +2,10 @@ const PROTOCOL = 'virtual-defunding-as-hub';
 import {
   checkThat,
   isSimpleEthAllocation,
-  add,
   isGuarantees,
   isIndirectFunding,
-  AllocationItem
+  AllocationItem,
+  BN
 } from '@statechannels/wallet-core';
 
 import {StateNodeConfig, assign, DoneInvokeEvent, Machine} from 'xstate';
@@ -67,9 +67,9 @@ const finalJointChannelUpdate = (store: Store) => async ({
         if (!invariantHubAllocation) throw new Error('Hub allocation changed');
 
         const amount = (i: AllocationItem) => i.amount;
-        const supportedAmount = supportedItems.map(amount).reduce(add);
-        const newAmount = newItems.map(amount).reduce(add);
-        const invariantTotal = supportedAmount.eq(newAmount);
+        const supportedAmount = supportedItems.map(amount).reduce(BN.add);
+        const newAmount = newItems.map(amount).reduce(BN.add);
+        const invariantTotal = BN.eq(supportedAmount, newAmount);
 
         if (!invariantTotal) throw new Error('Total allocation changed');
       }),

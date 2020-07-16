@@ -17,9 +17,8 @@ import {
   StateVariables,
   checkThat,
   isSimpleEthAllocation,
-  add
+  BN
 } from '@statechannels/wallet-core';
-import {Zero} from '@ethersproject/constants';
 
 import {Store} from '../store';
 import {SupportState} from '.';
@@ -127,8 +126,8 @@ const getDepositingInfo = (
   const {supported, myIndex} = await store.getEntry(context.ledgerId);
   const {allocationItems} = checkThat(supported?.outcome, isSimpleEthAllocation);
 
-  const fundedAt = allocationItems.map(a => a.amount).reduce(add);
-  const depositAt = myIndex === 0 ? allocationItems[0].amount : Zero;
+  const fundedAt = allocationItems.map(a => a.amount).reduce(BN.add);
+  const depositAt = myIndex === 0 ? allocationItems[0].amount : BN.from(0);
   return {channelId: context.ledgerId, depositAt, totalAfterDeposit: fundedAt, fundedAt};
 };
 

@@ -1,7 +1,13 @@
 import * as _ from 'lodash';
 import Dexie, {Transaction, TransactionMode} from 'dexie';
 import {BigNumber} from 'ethers';
-import {Objective, DomainBudget, ChannelStoredData, AssetBudget} from '@statechannels/wallet-core';
+import {
+  Objective,
+  DomainBudget,
+  ChannelStoredData,
+  AssetBudget,
+  BN
+} from '@statechannels/wallet-core';
 import {ChannelStoreEntry} from './channel-store-entry';
 import {DBBackend, ObjectStores, TXMode} from '.';
 
@@ -114,8 +120,8 @@ export class Backend implements DBBackend {
       ...budget,
       forAsset: _.mapValues(budget.forAsset, (assetBudget: AssetBudget) => ({
         assetHolderAddress: assetBudget.assetHolderAddress,
-        availableReceiveCapacity: BigNumber.from(assetBudget.availableReceiveCapacity),
-        availableSendCapacity: BigNumber.from(assetBudget.availableSendCapacity),
+        availableReceiveCapacity: BN.from(assetBudget.availableReceiveCapacity),
+        availableSendCapacity: BN.from(assetBudget.availableSendCapacity),
         channels: assetBudget.channels
       }))
     };

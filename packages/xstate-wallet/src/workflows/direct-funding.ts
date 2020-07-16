@@ -1,17 +1,16 @@
 import {Machine, MachineConfig} from 'xstate';
 import _ from 'lodash';
-import {BigNumber} from 'ethers';
 import {AddressZero, HashZero, Zero} from '@ethersproject/constants';
 
 import {
-  add,
   isSimpleEthAllocation,
   simpleEthAllocation,
   checkThat,
   Outcome,
   SimpleAllocation,
   AllocationItem,
-  Destination
+  Destination,
+  BN
 } from '@statechannels/wallet-core';
 
 import {Store} from '../store';
@@ -102,11 +101,11 @@ export const machine: MachineFactory<Init, any> = (store: Store, context: Init) 
         const currentlyAllocated = currentOutcome.allocationItems
           .filter(i => i.destination === destination)
           .map(i => i.amount)
-          .reduce(add);
+          .reduce(BN.add);
 
-        const amountLeft = BigNumber.from(amount).gt(currentlyAllocated)
-          ? amount.sub(currentlyAllocated)
-          : Zero;
+        const amountLeft = BN.gt(amount, currentlyAllocated)
+          ? BN.sub(amount, currentlyAllocated)
+          : BN.from(0);
         return {destination, amount: amountLeft};
       })
     );
@@ -122,7 +121,7 @@ export const machine: MachineFactory<Init, any> = (store: Store, context: Init) 
       amount: outcome.allocationItems
         .filter(i => i.destination === destination)
         .map(i => i.amount)
-        .reduce(add)
+        .reduce(BN.add)
     }));
 
     return simpleEthAllocation(allocationItems);
@@ -134,21 +133,21 @@ export const machine: MachineFactory<Init, any> = (store: Store, context: Init) 
     if (!isSimpleEthAllocation(supportedOutcome)) {
       throw new Error('Unsupported outcome');
     }
-    let totalBeforeDeposit = Zero;
+    let totalBeforeDeposit = BN.from(0);
     for (let i = 0; i < minimalAllocation.length; i++) {
       const allocation = minimalAllocation[i];
       if (myIndex === i) {
-        const fundedAt = supportedOutcome.allocationItems.map(a => a.amount).reduce(add);
+        const fundedAt = supportedOutcome.allocationItems.map(a => a.amount).reduce(BN.add);
 
         return {
           channelId,
           depositAt: totalBeforeDeposit,
-          totalAfterDeposit: BigNumber.from(totalBeforeDeposit).add(allocation.amount),
+          totalAfterDeposit: BN.add(totalBeforeDeposit, allocation.amount),
 
           fundedAt
         };
       } else {
-        totalBeforeDeposit = BigNumber.from(allocation.amount).add(totalBeforeDeposit);
+        totalBeforeDeposit = BN.add(allocation.amount, totalBeforeDeposit);
       }
     }
 
