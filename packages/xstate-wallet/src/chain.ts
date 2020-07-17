@@ -6,7 +6,7 @@ import {
   ChallengeRegisteredEvent,
   SignedState as NitroSignedState
 } from '@statechannels/nitro-protocol';
-import {Contract, Wallet, BigNumber, utils} from 'ethers';
+import {Contract, Wallet, utils, BigNumber, BigNumberish} from 'ethers';
 
 import {Observable, fromEvent, from, merge, interval} from 'rxjs';
 import {filter, map, flatMap, distinctUntilChanged} from 'rxjs/operators';
@@ -59,7 +59,7 @@ export interface Chain {
   challenge: (support: SignedState[], privateKey: string) => Promise<string | undefined>;
   finalizeAndWithdraw: (finalizationProof: SignedState[]) => Promise<string | undefined>;
   getChainInfo: (channelId: string) => Promise<ChannelChainInfo>;
-  balanceUpdatedFeed(address: string): Observable<BigNumber>;
+  balanceUpdatedFeed(address: string): Observable<Uint256>;
 }
 
 type Updated = ChannelChainInfo & {channelId: string};
@@ -208,9 +208,9 @@ export class FakeChain implements Chain {
 
     return merge(first, updates);
   }
-  public balanceUpdatedFeed(): Observable<BigNumber> {
+  public balanceUpdatedFeed(): Observable<Uint256> {
     // You're rich!
-    return from([BigNumber.from('0x999999999999')]);
+    return from([BN.from('0x999999999999')]);
   }
   public challengeRegisteredFeed(channelId: string): Observable<ChallengeRegistered> {
     const updates = fromEvent(this.eventEmitter, 'challengeRegistered').pipe(
@@ -404,42 +404,30 @@ export class ChainWatcher implements Chain {
 
     const amount: Uint256 = BN.from(await ethAssetHolder.holdings(channelId));
 
-    const result = await this._adjudicator.getChannelStorage(channelId);
+    const result: BigNumberish[] = await this._adjudicator.getChannelStorage(channelId);
 
-    const [turnNumRecord, finalizesAt] = result.map(BigNumber.from);
+    const [turnNumRecord, finalizesAt] = result.map(BN.toNumber);
 
     const blockNum = await this.provider.getBlockNumber();
-    chainLogger.trace(
-      {
-        amount,
-        channelStorage: {
-          turnNumRecord,
-          finalizesAt
-        },
-        finalized: finalizesAt.gt(0) && finalizesAt.lte(blockNum),
-        blockNum
-      },
-      'Chain query result'
-    );
-    // TODO: Fetch other info
-    return {
+    const info = {
       amount,
-      channelStorage: {
-        turnNumRecord,
-        finalizesAt
-      },
-      finalized: finalizesAt.gt(0) && finalizesAt.lte(blockNum),
+      channelStorage: {turnNumRecord, finalizesAt},
+      finalized: finalizesAt > 0 && finalizesAt <= blockNum,
       blockNum
     };
+    chainLogger.trace(info, 'Chain query result');
+
+    // TODO: Fetch other info
+    return info;
   }
 
-  public balanceUpdatedFeed(address: string): Observable<BigNumber> {
-    const first = from(this.provider.getBalance(address));
-    const updates = fromEvent<BigNumber>(this.provider, 'block').pipe(
-      flatMap(() => this.provider.getBalance(address))
+  public balanceUpdatedFeed(address: string): Observable<Uint256> {
+    const first = from(this.provider.getBalance(address).then(BN.from));
+    const updates = fromEvent<Uint256>(this.provider, 'block').pipe(
+      flatMap(() => this.provider.getBalance(address).then(BN.from))
     );
 
-    return merge(first, updates).pipe(distinctUntilChanged((a, b) => a.eq(b)));
+    return merge(first, updates).pipe(distinctUntilChanged<Uint256>(BN.eq));
   }
 
   public chainUpdatedFeed(channelId: string): Observable<ChannelChainInfo> {
@@ -451,13 +439,13 @@ export class ChainWatcher implements Chain {
 
     const depositEvents = fromEvent(this._assetHolders[0], 'Deposited').pipe(
       // TODO: Type event correctly, use ethers-utils.js
-      filter((event: Array<string | BigNumber | any>) => event[0] === channelId),
+      filter((event: Array<any>) => event[0] === channelId),
       // TODO: Currently it seems that getChainInfo can return stale information
       // so as a workaround we use the amount from the event
       // see https://github.com/statechannels/monorepo/issues/1995
       flatMap(async event => ({
         ...(await this.getChainInfo(channelId)),
-        amount: event.slice(-1)[0].args.destinationHoldings
+        amount: BN.from(event.slice(-1)[0].args.destinationHoldings)
       }))
     );
 
