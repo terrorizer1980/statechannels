@@ -4903,6 +4903,13 @@
     write-json-file "4.2.0"
     yargs "15.1.0"
 
+"@statechannels/wire-format@0.0.7":
+  version "0.0.7"
+  resolved "https://registry.npmjs.org/@statechannels/wire-format/-/wire-format-0.0.7.tgz#288fa4bdb93df3ea3ff762253106abb9d2a1aaef"
+  integrity sha512-D9rFe079FNj5kKil+jj8yAMnrWYAgIZ7UhfJ5JR3GFtHc65jTkMzFjuZUvi+1rJPMRMF0uPWlefDnvd4ulHTYA==
+  dependencies:
+    ajv "6.11.0"
+
 "@storybook/addon-actions@5.3.9":
   version "5.3.9"
   resolved "https://registry.npmjs.org/@storybook/addon-actions/-/addon-actions-5.3.9.tgz#fc8b1d912c87f418e69c2b52031d29465bb4867b"
