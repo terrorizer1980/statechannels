@@ -8,7 +8,8 @@
     "rootDir": "src",
     "outDir": "lib",
     "esModuleInterop": true,
-    "strict": false
+    "strict": false,
+    "types": ["jest", "node"]
   },
   "include": ["src/**/*"],
   "exclude": ["**/*test_data.ts", "**/__mocks__/*"]
