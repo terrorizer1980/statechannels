@@ -32,7 +32,6 @@ save_dep: &save_dep
       - packages/devtools/node_modules
       - packages/jest-gas-reporter/node_modules
       - packages/nitro-protocol/node_modules
-      - packages/simple-hub/node_modules
       - packages/wire-format/node_modules
       - packages/xstate-wallet/node_modules
 
@@ -52,7 +51,6 @@ save_built_artifacts: &save_built_artifacts
       - packages/devtools/lib
       - packages/jest-gas-reporter/lib
       - packages/nitro-protocol/lib
-      - packages/simple-hub/lib
       - packages/wire-format/lib
       - packages/xstate-wallet/lib
       # Smart contract compiles
@@ -161,6 +159,7 @@ jobs:
       - log_stats:
           file: prepare-stats
       - <<: *restore_dep
+      - run: asdf
       - run: yarn --frozen-lockfile
       - <<: *save_dep
 
