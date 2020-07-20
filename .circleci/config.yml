@@ -23,18 +23,9 @@ integration_test_settings: &integration_test_settings
 
 save_dep: &save_dep
   save_cache:
-    key: v6-dependency-cache-{{ checksum "yarn.lock" }}
+    key: v7-dependency-cache-{{ checksum "yarn.lock" }}
     paths:
       - /usr/local/share/.cache/yarn
-      - node_modules
-      - packages/channel-client/node_modules
-      - packages/channel-provider/node_modules
-      - packages/client-api-schema/node_modules
-      - packages/devtools/node_modules
-      - packages/jest-gas-reporter/node_modules
-      - packages/nitro-protocol/node_modules
-      - packages/wire-format/node_modules
-      - packages/xstate-wallet/node_modules
 
 restore_dep: &restore_dep
   restore_cache:
@@ -159,9 +150,7 @@ jobs:
       - checkout
       - log_stats:
           file: prepare-stats
-      - <<: *restore_dep
       - run: yarn --frozen-lockfile
-      - <<: *save_dep
 
       - persist_to_workspace:
           root: /home/circleci/project
