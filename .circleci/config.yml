@@ -160,7 +160,6 @@ jobs:
       - log_stats:
           file: prepare-stats
       - <<: *restore_dep
-      - run: asdf
       - run: yarn --frozen-lockfile
       - <<: *save_dep
 
