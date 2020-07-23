@@ -6,6 +6,7 @@
       "app-devs/quick-start-contracts",
       "app-devs/quick-start-dapp",
       "app-devs/hook-up-messaging",
+      "app-devs/make-api-calls",
       "channel-client-api/channel-client.channelclient"
     ],
     "Protocol Docs": [
