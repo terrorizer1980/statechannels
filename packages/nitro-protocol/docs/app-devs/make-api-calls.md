@@ -3,11 +3,11 @@ id: make-api-calls
 title: Make API calls using the ChannelClient
 ---
 
-
 ## Sequence diagram
-In the following, `p` is shorthand for `window.channelProvider`, and Client(A/B) is an instance of the [`ChannelClient` class](../channel-client-api/channel-client.channelclient) created by each participants' application. 
 
-Also shown is the "activation" of each wallet at certain times, indicating the UI will popup and the user may be required to send a blockchain transaction or otherwise signal their intent to perform an action. 
+In the following, `p` is shorthand for `window.channelProvider`, and Client(A/B) is an instance of the [`ChannelClient` class](../channel-client-api/channel-client.channelclient) created by each participants' application.
+
+Also shown is the "activation" of each wallet at certain times, indicating the UI will popup and the user may be required to send a blockchain transaction or otherwise signal their intent to perform an action.
 
 <div class="mermaid" align="center">
 sequenceDiagram
@@ -31,20 +31,33 @@ participant WalletB
 rect rgba(0, 0, 255, .1)
     note left of WalletB: Opening a channel
     ClientA->>WalletA: c.createChannel();
-    WalletA-->>ClientA: ChannelUpdated('proposed')
+    WalletA-->>ClientA: ChannelUpdated('opening')
     WalletA-->>ClientA: MessageQueued(msg)
-    ClientA->>ClientB: msg
-    ClientB->>WalletB: pushMessage(msg)
+    ClientA->>ClientB: msg0
+    ClientB->>WalletB: pushMessage(msg0)
     WalletB-->>ClientB: ChannelProposed('id')
     ClientB->>+WalletB: c.joinChannel('id');
-    WalletB-->>ClientB: ChannelUpdated('opening');
+    WalletB-->>ClientB: ChannelUpdated('funding');
     WalletB-->>ClientB: MessageQueued(msg)
-    ClientB->>ClientA: msg;
-    ClientA->>+WalletA: c.pushMessage(msg);
-    WalletA-->>-ClientA: ChannelUpdated('running')
+    ClientB->>ClientA: msg1;
+    ClientA->>+WalletA: c.pushMessage(msg1);
+    WalletA-->>-ClientA: ChannelUpdated('funding')
+    WalletA->>Chain: deposit()
+    Chain-->>WalletA: A-DEPOSITED
+    Chain-->>WalletB: A-DEPOSITED
+    WalletB->>Chain: deposit()
+    Chain-->>WalletA: B-DEPOSITED
+    Chain-->>WalletB: B-DEPOSITED
+    WalletA-->>ClientA: MessageQueued(msg2)
+    ClientA->>ClientB: msg2
+    ClientB->>WalletB: pushMessage(msg2)
     WalletB-->>-ClientB: ChannelUpdated('running')
+    WalletB-->>ClientB: MessageQueued(msg3)
+    ClientB->>ClientA: msg3;
+    ClientA->>+WalletA: c.pushMessage(msg3);
+    WalletA-->>-ClientA: ChannelUpdated('running')
 end
-loop n times 
+loop n times
     note left of WalletB: Running a channel
     ClientA->>WalletA: c.updateChannel(state-A);
     WalletA-->>ClientA: ChannelUpdated(state-A)
