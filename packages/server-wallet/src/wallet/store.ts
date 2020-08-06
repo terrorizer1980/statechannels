@@ -21,7 +21,7 @@ import {addHash} from '../state-utils';
 import {ChannelState} from '../protocols/state';
 import {WalletError, Values} from '../errors/wallet-error';
 import knex from '../db/connection';
-import {Bytes32} from '../type-aliases';
+import {Bytes32, Address, Uint256, Uint48, Uint160} from '../type-aliases';
 
 export type AppHandler<T> = (tx: Transaction, channel: ChannelState) => T;
 export type MissingAppHandler<T> = (channelId: string) => T;
@@ -143,6 +143,27 @@ export const Store = {
       .update(cols)
       .returning('*')
       .first();
+  },
+
+  async setAssetHolderState(
+    _assetHolderAddress: Address,
+    _assetHolderState: {
+      [holdingsId: string]: Uint256;
+    }
+  ): Promise<void> {
+    // for every channel where an outcome has assetHolderAddress in it
+    // update the onchainAssets column with [assetholderaddres]: amount
+  },
+
+  async setAdjudicatorState(_adjudciatorState: {
+    [channelId: string]: {
+      turnNumRecord: Uint48;
+      finalizedAt: Uint48;
+      fingerprint: Uint160;
+    };
+  }): Promise<void> {
+    // for every channel update a column called adjudicatorState
+    // with the relevant data
   },
 };
 

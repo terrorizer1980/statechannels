@@ -43,6 +43,7 @@ export interface RequiredColumns {
   readonly participants: Participant[];
   readonly vars: SignedStateVarsWithHash[];
   readonly signingAddress: Address;
+  readonly onchainAssets: {[assetHolderAddress: string]: Uint256};
 }
 
 export type ComputedColumns = {
@@ -66,6 +67,7 @@ export class Channel extends Model implements RequiredColumns {
   readonly challengeDuration!: Uint48;
   readonly participants!: Participant[];
   readonly signingAddress!: Address;
+  readonly onchainAssets!: {[assetHolderAddress: string]: Uint256};
 
   readonly signingWallet!: SigningWallet;
 

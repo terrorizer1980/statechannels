@@ -16,6 +16,7 @@ import {
   convertToParticipant,
 } from '@statechannels/wallet-core';
 import * as Either from 'fp-ts/lib/Either';
+import {providers, Signer} from 'ethers';
 
 import {Bytes32} from '../type-aliases';
 import {Channel} from '../models/channel';
@@ -54,7 +55,46 @@ export type WalletInterface = {
   onNotification(cb: (notice: StateChannelsNotification) => void): {unsubscribe: () => void};
 };
 
+interface WalletInitializationArguments {
+  provider: providers.BaseProvider;
+  fundingSigner: Signer;
+}
+
 export class Wallet implements WalletInterface {
+  private readonly provider: providers.BaseProvider;
+  private readonly fundingSigner: Signer;
+
+  public static async create(walletConfig: WalletInitializationArguments): Promise<Wallet> {
+    const wallet = new Wallet(walletConfig);
+
+    await wallet.sync();
+
+    return wallet;
+  }
+
+  private async sync(): Promise<void> {
+    //
+    // Get <list of asset holders> from existing Channels in the DB
+    //
+    // Use this.provider to query NitroAdjudicator and <list of asset holders>
+    //
+    // await Store.setAssetHolderState();
+    // await Store.setAdjudicatorState();
+  }
+
+  private constructor(walletConfig: WalletInitializationArguments) {
+    if (!walletConfig.provider)
+      logger.warn(
+        'No blockchain provider given to new Wallet. Channels may be challenges or defunded without your knowledge'
+      );
+
+    if (!walletConfig.fundingSigner)
+      logger.warn('No funding account given to new Wallet. Channels will not auto-deposit.');
+
+    this.provider = walletConfig.provider;
+    this.fundingSigner = walletConfig.fundingSigner;
+  }
+
   async createChannel(args: CreateChannelParams): SingleChannelResult {
     return Channel.transaction(async tx => {
       const {participants, appDefinition, appData, allocations} = args;
@@ -171,6 +211,18 @@ export class Wallet implements WalletInterface {
   onNotification(_cb: (notice: StateChannelsNotification) => void): {unsubscribe: () => void} {
     throw 'Unimplemented';
   }
+
+  async pushBlockchainEvent(_args: {channelId: string}): Promise<void> {
+    // provide events of either:
+    //
+    // ChallengeRegistered
+    // ChallengeCleared
+    // Concluded
+    // Deposited
+    // AssetTransferred
+    //
+    // and update Channel.onchainAssets or Channel.adjudicatorState
+  }
 }
 
 type ExecutionResult = {
@@ -180,6 +232,9 @@ type ExecutionResult = {
 };
 
 const takeActions = async (channels: Bytes32[]): Promise<ExecutionResult> => {
+  // this function should be provided fundedSigner so
+  // it can use it for SubmitTransaction actions
+
   const outbox: Outgoing[] = [];
   const channelResults: ChannelResult[] = [];
   let error: Error | undefined = undefined;
