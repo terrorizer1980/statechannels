@@ -42,7 +42,7 @@ const allocations = [
 const appDefinition = '0x430869383d611bBB1ce7Ca207024E7901bC26b40';
 const appData =
   '0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000016345785d8a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004444444444444444444444444444444444444444444444444444444444444444';
-const fundingStrategy = 'Direct';
+const fundingStrategy = 'Virtual';
 
 let channelProvider: IFrameChannelProviderInterface;
 let channelClient: ChannelClient;
@@ -66,7 +66,7 @@ beforeAll(async () => {
 });
 
 describe('Client-Provider-Wallet', () => {
-  it('Calls createChannel()', async done => {
+  it('Calls createChannel() with direct funding, and queues an appropriate message', async done => {
     signingAddress = channelProvider.signingAddress as string;
     participants[0].signingAddress = signingAddress;
 
