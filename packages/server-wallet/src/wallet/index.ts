@@ -119,10 +119,13 @@ export class Wallet implements WalletInterface {
 
       const cols = {...channelConstants, vars, signingAddress};
 
-      const {channelId} = await Channel.query(tx).insert(cols);
+      const channel = await Channel.query(tx)
+        .insert(cols)
+        .withGraphFetched('funding')
+        .withGraphFetched('signingWallet');
 
       const {outgoing, channelResult} = await Store.signState(
-        channelId,
+        channel,
         {...channelConstants, turnNum: 0, isFinal: false, appData, outcome},
         tx
       );
@@ -133,8 +136,8 @@ export class Wallet implements WalletInterface {
 
   async joinChannel({channelId}: JoinChannelParams): SingleChannelResult {
     const criticalCode: AppHandler<SingleChannelResult> = async (tx, channel) => {
-      const nextState = getOrThrow(JoinChannel.joinChannel({channelId}, channel));
-      const {outgoing, channelResult} = await Store.signState(channelId, nextState, tx);
+      const nextState = getOrThrow(JoinChannel.joinChannel({channelId}, channel.protocolState));
+      const {outgoing, channelResult} = await Store.signState(channel, nextState, tx);
       return {outbox: outgoing.map(n => n.notice), channelResult};
     };
 
@@ -166,9 +169,9 @@ export class Wallet implements WalletInterface {
       const outcome = deserializeAllocations(allocations);
 
       const nextState = getOrThrow(
-        UpdateChannel.updateChannel({channelId, appData, outcome}, channel)
+        UpdateChannel.updateChannel({channelId, appData, outcome}, channel.protocolState)
       );
-      const {outgoing, channelResult} = await Store.signState(channelId, nextState, tx);
+      const {outgoing, channelResult} = await Store.signState(channel, nextState, tx);
 
       return {outbox: outgoing.map(n => n.notice), channelResult};
     };
@@ -184,8 +187,8 @@ export class Wallet implements WalletInterface {
       );
     };
     const criticalCode: AppHandler<SingleChannelResult> = async (tx, channel) => {
-      const nextState = getOrThrow(CloseChannel.closeChannel(channel));
-      const {outgoing, channelResult} = await Store.signState(channelId, nextState, tx);
+      const nextState = getOrThrow(CloseChannel.closeChannel(channel.protocolState));
+      const {outgoing, channelResult} = await Store.signState(channel, nextState, tx);
 
       return {outbox: outgoing.map(n => n.notice), channelResult};
     };
@@ -243,7 +246,7 @@ const takeActions = async (channels: Bytes32[]): Promise<ExecutionResult> => {
   const channelResults: ChannelResult[] = [];
   let error: Error | undefined = undefined;
   while (channels.length && !error) {
-    await Store.lockApp(channels[0], async tx => {
+    await Store.lockApp(channels[0], async (tx, channel) => {
       // For the moment, we are only considering directly funded app channels.
       // Thus, we can directly fetch the channel record, and immediately construct the protocol state from it.
       // In the future, we can have an App model which collects all the relevant channels for an app channel,
@@ -266,7 +269,7 @@ const takeActions = async (channels: Bytes32[]): Promise<ExecutionResult> => {
       const doAction = async (action: ProtocolAction): Promise<any> => {
         switch (action.type) {
           case 'SignState': {
-            const {outgoing} = await Store.signState(action.channelId, action, tx);
+            const {outgoing} = await Store.signState(channel, action, tx);
             outgoing.map(n => outbox.push(n.notice));
             return;
           }

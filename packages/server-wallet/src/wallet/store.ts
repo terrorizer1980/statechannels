@@ -36,7 +36,7 @@ import {Funding} from '../models/funding';
 
 import {UpdateChannelFundingParams, ChannelResult} from '.';
 
-export type AppHandler<T> = (tx: Transaction, channel: ChannelState) => T;
+export type AppHandler<T> = (tx: Transaction, channel: Channel) => T;
 export type MissingAppHandler<T> = (channelId: string) => T;
 class UniqueViolationError extends Error {
   columns: string[] = [];
@@ -107,17 +107,15 @@ export const Store = {
         .first();
 
       if (!channel) return onChannelMissing(channelId);
-      return criticalCode(tx, channel.protocolState);
+      return criticalCode(tx, channel);
     });
   },
 
   signState: async function(
-    channelId: Bytes32,
+    channel: Channel,
     vars: StateVariables,
     tx: Transaction
   ): Promise<{outgoing: SyncState; channelResult: ChannelResult}> {
-    let channel = await Channel.forId(channelId, tx);
-
     const state: State = {...channel.channelConstants, ...vars};
 
     validateStateFreshness(state, channel);
