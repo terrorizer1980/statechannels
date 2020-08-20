@@ -74,7 +74,7 @@ describe('Client-Provider-Wallet', () => {
       recipient: '0x590A3Bd8D4A3b78411B3bDFb481E44e85C7345c0',
       sender: signingAddress,
       data: {
-        objectives: expect.any(Array),
+        objectives: undefined,
         signedStates: [
           {
             appData,
