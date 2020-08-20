@@ -24,7 +24,9 @@ describe('signState', () => {
   let c: Channel;
 
   beforeEach(async () => {
-    c = await Channel.query().insert(channel({vars: [stateWithHashSignedBy(bob())()]}));
+    c = await Channel.query()
+      .insert(channel({vars: [stateWithHashSignedBy(bob())()]}))
+      .withGraphFetched('signingWallet');
   });
 
   it('signs the state, returning outgoing messages and a channelResult', async () => {
