@@ -24,9 +24,9 @@ export const validateTransitionWithEVM = async (
     undefined
   );
   if (!bytecode) {
-    logger.warn(
-      `No bytecode found for appDefinition ${from.appDefinition} and chain id ${config.chainNetworkID}. Skipping valid transition check`
-    );
+    // logger.warn(
+    //   `No bytecode found for appDefinition ${from.appDefinition} and chain id ${config.chainNetworkID}. Skipping valid transition check`
+    // );
     return true;
   }
 
