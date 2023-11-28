@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "patch-package": "6.2.0"
+    "patch-package": "6.4.6"
   },
   "devDependencies": {
     "@statechannels/devtools": "^0.3.5",
